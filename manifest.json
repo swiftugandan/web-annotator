@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Transparent Screenshot Annotator",
   "version": "1.0",
-  "description": "Overlay a transparent annotation canvas on any webpage and capture screenshots",
-  "permissions": ["activeTab", "scripting", "storage", "downloads", "tabs"],
+  "description": "Overlay a transparent annotation canvas on any webpage",
+  "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Annotate Page",
@@ -23,7 +23,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js"],
+      "resources": ["content.js", "js/textWidget.js", "js/uiElements.js", "js/drawingTools.js"],
       "matches": ["<all_urls>"]
     }
   ]

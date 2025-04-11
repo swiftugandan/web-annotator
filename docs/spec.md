@@ -1,16 +1,13 @@
-# Chrome Extension: Transparent Annotation Overlay with Screenshot & AWS Upload
+# Chrome Extension: Transparent Annotation Overlay
 
-A comprehensive guide to building a Chrome extension that overlays a transparent annotation canvas on any webpage, lets users annotate directly, captures the final screenshot, uploads it to AWS S3, and retrieves the image link.
+A comprehensive guide to building a Chrome extension that overlays a transparent annotation canvas on any webpage, lets users annotate directly.
 
 ---
 
 ## 📋 Features Overview
 
-- **Transparent Overlay:** Inject a transparent Fabric.js canvas over the current webpage.
+- **Transparent Overlay:** Inject a transparent canvas over the current webpage.
 - **Annotate Directly:** Draw, highlight, or add text directly on the webpage.
-- **Capture Annotated Screenshot:** Take a screenshot including the annotations.
-- **Upload to AWS S3:** Save the screenshot securely to an AWS S3 bucket.
-- **Retrieve Link:** Display the public URL of the uploaded image.
 
 ---
 
@@ -20,10 +17,6 @@ A comprehensive guide to building a Chrome extension that overlays a transparent
 flowchart TD
     A[User clicks extension] --> B[Inject transparent canvas]
     B --> C[User annotates webpage]
-    C --> D[Capture screenshot with annotations]
-    D --> E[Upload to AWS S3]
-    E --> F[Get image URL]
-    F --> G[Display link to user]
 ```
 
 ---
@@ -33,10 +26,7 @@ flowchart TD
 | Component             | Technology                     |
 |-----------------------|--------------------------------|
 | Browser Extension     | Chrome Extensions API          |
-| Overlay & Annotation  | Fabric.js                      |
-| Screenshot Capture    | `html2canvas`                  |
-| Backend Storage       | AWS S3                         |
-| AWS Integration       | AWS SDK (JavaScript)           |
+| Overlay & Annotation  | HTML Canvas API                |
 
 ---
 
@@ -60,7 +50,7 @@ flowchart TD
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js", "fabric.min.js", "html2canvas.min.js"],
+      "resources": ["content.js", "js/textWidget.js", "js/uiElements.js", "js/drawingTools.js"],
       "matches": ["<all_urls>"]
     }
   ]
@@ -86,7 +76,7 @@ chrome.action.onClicked.addListener((tab) => {
 
 ### 3. **`content.js`**
 
-Injects a transparent Fabric.js canvas overlay, provides annotation tools, and handles screenshot + upload.
+Injects a transparent canvas overlay and provides annotation tools.
 
 ```js
 (async function() {
@@ -94,43 +84,16 @@ Injects a transparent Fabric.js canvas overlay, provides annotation tools, and h
   if (window.__annotatorInjected) return;
   window.__annotatorInjected = true;
 
-  // Load Fabric.js and html2canvas dynamically if not present
-  const loadScript = (src) => new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    document.head.appendChild(s);
-  });
+  // Load necessary scripts (e.g., textWidget.js, uiElements.js, drawingTools.js)
+  // Assume these are loaded via web_accessible_resources
+  const { createTextWidget, removeTextWidget, setAnnotations, setRedrawFunction } = await import(chrome.runtime.getURL('js/textWidget.js'));
+  const { createUIElements, Z_INDEX } = await import(chrome.runtime.getURL('js/uiElements.js'));
+  const { startDrawing, draw, redrawAnnotations, startShape, updateShape, endShape, drawShape } = await import(chrome.runtime.getURL('js/drawingTools.js'));
 
-  if (!window.fabric) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js');
-  if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-
-  // Create overlay container
-  const overlay = document.createElement('div');
-  overlay.style.position = 'fixed';
-  overlay.style.top = 0;
-  overlay.style.left = 0;
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
-  overlay.style.zIndex = 999999;
-  overlay.style.pointerEvents = 'none'; // Allow clicks to pass through initially
-  overlay.style.background = 'rgba(0,0,0,0.0)';
-  document.body.appendChild(overlay);
-
-  // Create canvas element
-  const canvasEl = document.createElement('canvas');
-  canvasEl.id = 'annotationCanvas';
-  canvasEl.width = window.innerWidth;
-  canvasEl.height = window.innerHeight;
-  overlay.appendChild(canvasEl);
-
-  // Initialize Fabric.js canvas
-  const canvas = new fabric.Canvas('annotationCanvas', {
-    backgroundColor: 'transparent',
-    selection: true
-  });
-
-  overlay.style.pointerEvents = 'auto'; // Enable interaction
+  // Constants (COLORS, TOOLS)
+  // ... state management ...
+  // ... createUIElements call ...
+  // ... setup event listeners ...
 
   // Add simple toolbar
   const toolbar = document.createElement('div');
@@ -145,112 +108,18 @@ Injects a transparent Fabric.js canvas overlay, provides annotation tools, and h
   toolbar.style.fontFamily = 'sans-serif';
   toolbar.innerHTML = `
     <button id="draw">Draw</button>
+    <input type="color" id="color-picker" value="#ff0000" title="Drawing Color">
+    <button id="shapes">Shapes</button>
     <button id="text">Text</button>
+    <button id="eraser">Eraser</button>
     <button id="clear">Clear</button>
-    <button id="save">Save</button>
     <button id="close">Close</button>
   `;
   document.body.appendChild(toolbar);
 
-  // Tool actions
-  document.getElementById('draw').onclick = () => {
-    canvas.isDrawingMode = true;
-    canvas.freeDrawingBrush.width = 3;
-    canvas.freeDrawingBrush.color = 'red';
-  };
+  // Tool actions (Draw, Text, Shapes, Eraser, Clear, Close)
+  // ... (event listeners for buttons as in current implementation)
 
-  document.getElementById('text').onclick = () => {
-    canvas.isDrawingMode = false;
-    const text = new fabric.IText('Text here', {
-      left: 50,
-      top: 50,
-      fill: 'blue',
-      fontSize: 20
-    });
-    canvas.add(text).setActiveObject(text);
-  };
-
-  document.getElementById('clear').onclick = () => {
-    canvas.clear();
-    canvas.backgroundColor = 'transparent';
-  };
-
-  document.getElementById('close').onclick = () => {
-    overlay.remove();
-    toolbar.remove();
-    window.__annotatorInjected = false;
-  };
-
-  document.getElementById('save').onclick = async () => {
-    // Hide toolbar before screenshot
-    toolbar.style.display = 'none';
-
-    // Render Fabric canvas to data URL
-    const annotationDataUrl = canvas.toDataURL({
-      format: 'png',
-      multiplier: 1
-    });
-
-    // Capture the page with annotations
-    const screenshotCanvas = await html2canvas(document.body, {
-      backgroundColor: null,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      onclone: (clonedDoc) => {
-        // Inject the annotation image overlay into the cloned DOM
-        const img = clonedDoc.createElement('img');
-        img.src = annotationDataUrl;
-        img.style.position = 'fixed';
-        img.style.top = '0';
-        img.style.left = '0';
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.zIndex = 999999;
-        clonedDoc.body.appendChild(img);
-      }
-    });
-
-    screenshotCanvas.toBlob(async (blob) => {
-      // Upload to AWS S3
-      await uploadToS3(blob);
-    }, 'image/png');
-
-    // Restore toolbar
-    toolbar.style.display = 'block';
-  };
-
-  async function uploadToS3(blob) {
-    // Load AWS SDK dynamically
-    if (!window.AWS) {
-      await loadScript('https://sdk.amazonaws.com/js/aws-sdk-2.1481.0.min.js');
-    }
-
-    AWS.config.update({
-      accessKeyId: 'YOUR_ACCESS_KEY',
-      secretAccessKey: 'YOUR_SECRET_KEY',
-      region: 'YOUR_REGION'
-    });
-
-    const s3 = new AWS.S3();
-    const params = {
-      Bucket: 'YOUR_BUCKET_NAME',
-      Key: `annotated-${Date.now()}.png`,
-      Body: blob,
-      ContentType: 'image/png',
-      ACL: 'public-read'
-    };
-
-    s3.upload(params, function(err, data) {
-      if (err) {
-        alert('Upload failed: ' + err.message);
-        console.error(err);
-      } else {
-        alert('Uploaded! URL:\n' + data.Location);
-        window.open(data.Location, '_blank');
-      }
-    });
-  }
 })();
 ```
 
@@ -258,9 +127,7 @@ Injects a transparent Fabric.js canvas overlay, provides annotation tools, and h
 
 ## 🔒 Security Considerations
 
-- **Credentials:** Use IAM roles and temporary credentials (e.g., Cognito Identity Pools) instead of hardcoding keys.
-- **Bucket Policy:** Ensure your S3 bucket allows appropriate access (public-read or signed URLs).
-- **Data Privacy:** Inform users about data storage and access.
+- **Data Privacy:** Inform users if any data is stored locally (e.g., via `chrome.storage`).
 
 ---
 
@@ -272,24 +139,20 @@ Injects a transparent Fabric.js canvas overlay, provides annotation tools, and h
 
 ## 🚀 Future Enhancements
 
-- User authentication
-- History of uploaded images
-- More annotation tools (shapes, colors)
-- Export to PDF
-- Integration with other storage providers
+- User authentication (if needed)
+- Option to save/load annotations locally
+- More annotation tools (arrows, etc.)
+- Export annotations (e.g., as JSON)
 
 ---
 
 ## 📚 References
 
 - [Chrome Extensions Developer Guide](https://developer.chrome.com/docs/extensions/)
-- [Fabric.js Documentation](http://fabricjs.com/)
-- [html2canvas Documentation](https://html2canvas.hertzen.com/)
-- [AWS SDK for JavaScript](https://docs.aws.amazon.com/sdk-for-javascript/)
-- [Uploading Files to S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/upload-objects.html)
+- [HTML Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 
 ---
 
 ## 🎉 Conclusion
 
-This enhanced Chrome extension allows users to annotate directly over webpages with a transparent overlay, capture the final annotated screenshot, and share it effortlessly via AWS S3.
+This enhanced Chrome extension allows users to annotate directly over webpages with a transparent overlay.

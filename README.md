@@ -1,13 +1,11 @@
 # Transparent Screenshot Annotator
 
-A Chrome extension that allows you to annotate any webpage with a transparent overlay and capture screenshots.
+A Chrome extension that allows you to annotate any webpage with a transparent overlay.
 
 ## Features
 
 - **Transparent Overlay:** Creates a transparent canvas overlay on any webpage
-- **Annotation Tools:** Draw and add text directly on the webpage
-- **Screenshot Capture:** Take a screenshot including your annotations
-- **Local Download:** Save the annotated screenshot to your device
+- **Annotation Tools:** Draw, add text, and use shapes directly on the webpage
 
 ## Installation for Development
 
@@ -20,10 +18,11 @@ A Chrome extension that allows you to annotate any webpage with a transparent ov
 
 1. Click the extension icon in your browser toolbar when viewing any webpage
 2. Use the toolbar that appears to:
-   - Draw: Freehand drawing with red pen
+   - Draw: Freehand drawing with selectable color
+   - Shapes: Draw rectangles, circles, or lines
    - Text: Add text annotations
+   - Eraser: Erase parts of annotations
    - Clear: Remove all annotations
-   - Save: Capture a screenshot with annotations and download it
    - Close: Exit annotation mode
 
 ## Structure
@@ -38,7 +37,6 @@ A Chrome extension that allows you to annotate any webpage with a transparent ov
 - Color selector for drawing and text
 - Additional annotation tools (shapes, arrows, etc.)
 - Option to save annotations for later editing
-- AWS S3 upload option
 
 ## Deployment Instructions
 
