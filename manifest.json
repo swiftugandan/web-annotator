@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Transparent Screenshot Annotator",
-  "version": "1.0",
-  "description": "Overlay a transparent annotation canvas on any webpage",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "version": "1.1",
+  "description": "Overlay a transparent annotation canvas on any webpage (OOP Refactor)",
+  "permissions": ["activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Annotate Page",
@@ -23,7 +23,19 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js", "js/textWidget.js", "js/uiElements.js", "js/drawingTools.js"],
+      "resources": [
+          "content.js",
+          "src/js/core/AnnotatorController.js",
+          "src/js/core/CanvasManager.js",
+          "src/js/core/ToolbarManager.js",
+          "src/js/tools/DrawingTool.js",
+          "src/js/tools/ShapeTool.js",
+          "src/js/tools/EraserTool.js",
+          "src/js/tools/TextTool.js",
+          "src/js/utils/constants.js",
+          "src/js/utils/drawingUtils.js",
+          "src/js/utils/geometryUtils.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

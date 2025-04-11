@@ -1,3 +1,22 @@
+// Prevent multiple injections
+if (window.__annotatorInjected) {
+    console.log('Annotator already injected. Close existing instance first.');
+} else {
+    window.__annotatorInjected = true;
+    console.log('Injecting Annotator...');
+
+    // Dynamically import the controller
+    import(chrome.runtime.getURL('src/js/core/AnnotatorController.js'))
+        .then(({ AnnotatorController }) => {
+            // Instantiate the main controller to start the application
+            new AnnotatorController();
+        })
+        .catch(error => {
+            console.error('Failed to load AnnotatorController:', error);
+            window.__annotatorInjected = false; // Reset flag on failure
+        });
+}
+
 (async function() {
   // Avoid multiple injections
   if (window.__annotatorInjected) return;
