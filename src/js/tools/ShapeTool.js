@@ -8,8 +8,8 @@ export class ShapeTool {
     constructor(controller) {
         this.controller = controller;
         this.state = controller.state;
-        this.ctx = controller.canvasManager.ctx; // Need context
-        this.redrawAll = controller.redrawAll.bind(controller); // Need redraw function
+        this.ctx = controller.canvasManager.ctx;
+        this.redrawAll = controller.redrawAll.bind(controller);
     }
 
     //--- Shape Creation ---
@@ -24,10 +24,10 @@ export class ShapeTool {
             shapeType: this.state.currentShapeType || SHAPE_TYPES.RECTANGLE,
             color: this.state.drawColor,
             width: this.state.drawWidth,
-            rotation: 0, // Initialize rotation
+            rotation: 0,
             startX: this.state.shapeStartX,
             startY: this.state.shapeStartY,
-            endX: this.state.shapeStartX, // Initial end is same as start
+            endX: this.state.shapeStartX,
             endY: this.state.shapeStartY
         });
     }
@@ -39,18 +39,17 @@ export class ShapeTool {
         currentShape.endX = e.clientX;
         currentShape.endY = e.clientY;
 
-        this.redrawAll(); // Redraw to show shape in progress
+        this.redrawAll();
     }
 
     stop(e) {
         if (!this.state.isDrawingShape) return;
         this.state.isDrawingShape = false;
 
-        // Select the newly drawn shape
         this.state.selectedShapeIndex = this.state.annotations.length - 1;
-        this.state.interactionMode = 'none'; // Ready for moving/resizing
-        this.redrawAll(); // Show selection handles
-        this.controller.canvasManager.updateCursor(e.clientX, e.clientY); // Update cursor
+        this.state.interactionMode = 'none';
+        this.redrawAll();
+        this.controller.canvasManager.updateCursor(e.clientX, e.clientY);
     }
 
     //--- Shape Interaction ---
@@ -61,7 +60,7 @@ export class ShapeTool {
         this.state.dragStartX = mouseX;
         this.state.dragStartY = mouseY;
 
-        // 1. Check for handle interaction on selected shape
+        // Check for handle interaction on selected shape
         if (this.state.selectedShapeIndex !== null) {
             const selectedShape = this.state.annotations[this.state.selectedShapeIndex];
             const handle = this.getInteractionHandleAtPoint(mouseX, mouseY, selectedShape);
@@ -72,28 +71,26 @@ export class ShapeTool {
                     this.state.shapeCenter = this._getShapeCenter(selectedShape);
                 } else {
                     this.state.interactionMode = 'resizing';
-                    // Store original bounds for aspect ratio locking (optional)
-                    // this.state.originalShapeBounds = { ... };
                 }
-                return true; // Interaction started (handle)
+                return true;
             }
         }
 
-        // 2. Check for click on any shape (select/move)
+        // Check for click on any shape (select/move)
         const clickedShapeIndex = this.getShapeAtPoint(mouseX, mouseY);
         if (clickedShapeIndex !== null) {
             this.state.selectedShapeIndex = clickedShapeIndex;
             this.state.interactionMode = 'moving';
             this.redrawAll();
-            return true; // Interaction started (moving)
+            return true;
         }
 
-        // 3. Clicked on empty space - deselect and start drawing new shape
+        // Clicked on empty space - deselect and start drawing new shape
         this.state.selectedShapeIndex = null;
         this.state.interactionMode = 'none';
-        this.start(e); // Start drawing new shape
+        this.start(e);
         this.redrawAll();
-        return false; // No interaction with existing shape, started drawing
+        return false;
     }
 
     handleMoveInteraction(e) {
@@ -107,12 +104,11 @@ export class ShapeTool {
         } else if (this.state.interactionMode === 'rotating' && this.state.selectedShapeIndex !== null) {
             this._rotateShape(mouseX, mouseY);
         } else if (this.state.isDrawingShape) {
-            this.update(e); // Continue drawing new shape
+            this.update(e);
         } else {
             this.controller.canvasManager.updateCursor(mouseX, mouseY);
         }
 
-        // Update drag start for next move event AFTER calculations
         this.state.dragStartX = mouseX;
         this.state.dragStartY = mouseY;
     }
@@ -121,15 +117,14 @@ export class ShapeTool {
         if (['moving', 'resizing', 'rotating'].includes(this.state.interactionMode)) {
             if (this.state.selectedShapeIndex !== null) {
                  const shape = this.state.annotations[this.state.selectedShapeIndex];
-                 // Normalize coordinates AFTER interaction finishes, if needed
                  this._normalizeShape(shape);
-                 this.redrawAll(); // Ensure final state is drawn
+                 this.redrawAll();
              }
             this.state.interactionMode = 'none';
             this.state.activeHandle = null;
             this.controller.canvasManager.updateCursor(e.clientX, e.clientY);
         } else if (this.state.isDrawingShape) {
-            this.stop(e); // Finalize newly drawn shape
+            this.stop(e);
         }
     }
 
@@ -145,7 +140,7 @@ export class ShapeTool {
         this.redrawAll();
     }
 
-     _resizeShape(mouseX, mouseY) {
+    _resizeShape(mouseX, mouseY) {
         const shape = this.state.annotations[this.state.selectedShapeIndex];
         const handle = this.state.activeHandle;
         const directDx = mouseX - this.state.dragStartX;
@@ -158,22 +153,20 @@ export class ShapeTool {
                 case 'tl':
                 case 't':
                 case 'l':
-                case 'bl': // Treat bottom-left handle as moving the start point
+                case 'bl':
                     shape.startX += directDx;
                     shape.startY += directDy;
                     break;
                 // Handles associated with the end point
-                case 'tr': // Treat top-right handle as moving the end point
+                case 'tr':
                 case 'br':
                 case 'b':
                 case 'r':
                     shape.endX += directDx;
                     shape.endY += directDy;
                     break;
-                // Default case needed if other handles exist, but unlikely for line/arrow
             }
         } else {
-            // --- Original logic for Rectangles/Circles (Using unrotated coordinates) ---
             const center = this._getShapeCenter(shape);
             const rotation = shape.rotation || 0;
             const lastUnrotated = rotatePoint({ x: this.state.dragStartX, y: this.state.dragStartY }, center, -rotation);
@@ -204,7 +197,6 @@ export class ShapeTool {
             shape.startY = y1;
             shape.endX = x2;
             shape.endY = y2;
-             // --- End Original logic ---
         }
 
         this.redrawAll();
@@ -212,7 +204,7 @@ export class ShapeTool {
 
     _rotateShape(mouseX, mouseY) {
         const shape = this.state.annotations[this.state.selectedShapeIndex];
-        const center = this.state.shapeCenter; // Use stored center
+        const center = this.state.shapeCenter;
 
         const prevAngle = Math.atan2(this.state.dragStartY - center.y, this.state.dragStartX - center.x);
         const currentAngle = Math.atan2(mouseY - center.y, mouseX - center.x);
@@ -222,20 +214,18 @@ export class ShapeTool {
         this.redrawAll();
     }
 
-    // Normalize shape coordinates (e.g., ensure width/height positive for non-rotated rect/circle)
     _normalizeShape(shape) {
-         if (!shape.rotation && (shape.shapeType === SHAPE_TYPES.RECTANGLE || shape.shapeType === SHAPE_TYPES.CIRCLE)) {
-             const x1 = Math.min(shape.startX, shape.endX);
-             const y1 = Math.min(shape.startY, shape.endY);
-             const x2 = Math.max(shape.startX, shape.endX);
-             const y2 = Math.max(shape.startY, shape.endY);
-             shape.startX = x1;
-             shape.startY = y1;
-             shape.endX = x2;
-             shape.endY = y2;
-         }
-         // Normalization for rotated shapes or lines might differ or be unnecessary
-     }
+        if (!shape.rotation && (shape.shapeType === SHAPE_TYPES.RECTANGLE || shape.shapeType === SHAPE_TYPES.CIRCLE)) {
+            const x1 = Math.min(shape.startX, shape.endX);
+            const y1 = Math.min(shape.startY, shape.endY);
+            const x2 = Math.max(shape.startX, shape.endX);
+            const y2 = Math.max(shape.startY, shape.endY);
+            shape.startX = x1;
+            shape.startY = y1;
+            shape.endX = x2;
+            shape.endY = y2;
+        }
+    }
 
     //--- Hit Detection ---
 
@@ -262,23 +252,9 @@ export class ShapeTool {
             const pos = handlePositions[key];
             const touchRadius = (key === 'rotate') ? rotationTouchRadius : resizeTouchRadius;
 
-            // Simple distance check
             if (Math.abs(x - pos.x) <= touchRadius && Math.abs(y - pos.y) <= touchRadius) {
-                 return key;
+                return key;
             }
-            /* // More precise circle check for rotation handle
-            if (key === 'rotate') {
-                const dx = x - pos.x;
-                const dy = y - pos.y;
-                if (dx * dx + dy * dy <= rotationTouchRadius * rotationTouchRadius) {
-                    return key;
-                }
-            } else { // Bounding box check for resize handles
-                 if (x >= pos.x - touchRadius && x <= pos.x + touchRadius &&
-                     y >= pos.y - touchRadius && y <= pos.y + touchRadius) {
-                     return key;
-                 }
-            }*/
         }
         return null;
     }
@@ -289,7 +265,7 @@ export class ShapeTool {
         const rotation = annotation.rotation || 0;
         const unrotatedPoint = rotatePoint({ x, y }, center, -rotation);
 
-        ctx.beginPath(); // Start a new path for hit testing
+        ctx.beginPath();
         const minX = Math.min(annotation.startX, annotation.endX);
         const minY = Math.min(annotation.startY, annotation.endY);
         const maxX = Math.max(annotation.startX, annotation.endX);
@@ -302,7 +278,7 @@ export class ShapeTool {
         switch (annotation.shapeType) {
             case SHAPE_TYPES.RECTANGLE:
                 ctx.rect(minX, minY, width, height);
-                hit = ctx.isPointInPath(unrotatedPoint.x, unrotatedPoint.y) || ctx.isPointInStroke(unrotatedPoint.x, unrotatedPoint.y); // Check fill and stroke
+                hit = ctx.isPointInPath(unrotatedPoint.x, unrotatedPoint.y) || ctx.isPointInStroke(unrotatedPoint.x, unrotatedPoint.y);
                 break;
             case SHAPE_TYPES.CIRCLE:
                 const radius = Math.max(width, height) / 2;
@@ -315,21 +291,19 @@ export class ShapeTool {
             case SHAPE_TYPES.ARROW:
                 const dist = pointLineDistance(unrotatedPoint.x, unrotatedPoint.y, annotation.startX, annotation.startY, annotation.endX, annotation.endY);
                 const tolerance = (annotation.width / 2) + SHAPE_HANDLES.HIT_TOLERANCE;
-                 // Basic bounding box check first for optimization
-                 const lineMinX = Math.min(annotation.startX, annotation.endX) - tolerance;
-                 const lineMaxX = Math.max(annotation.startX, annotation.endX) + tolerance;
-                 const lineMinY = Math.min(annotation.startY, annotation.endY) - tolerance;
-                 const lineMaxY = Math.max(annotation.startY, annotation.endY) + tolerance;
+                const lineMinX = Math.min(annotation.startX, annotation.endX) - tolerance;
+                const lineMaxX = Math.max(annotation.startX, annotation.endX) + tolerance;
+                const lineMinY = Math.min(annotation.startY, annotation.endY) - tolerance;
+                const lineMaxY = Math.max(annotation.startY, annotation.endY) + tolerance;
 
-                 hit = (unrotatedPoint.x >= lineMinX && unrotatedPoint.x <= lineMaxX &&
-                        unrotatedPoint.y >= lineMinY && unrotatedPoint.y <= lineMaxY &&
-                        dist <= tolerance);
-                 break;
+                hit = (unrotatedPoint.x >= lineMinX && unrotatedPoint.x <= lineMaxX &&
+                       unrotatedPoint.y >= lineMinY && unrotatedPoint.y <= lineMaxY &&
+                       dist <= tolerance);
+                break;
         }
-        ctx.closePath(); // Close the path used for hit testing
+        ctx.closePath();
         return hit;
     }
-
 
     //--- Drawing Shapes and Handles ---
 
@@ -348,7 +322,7 @@ export class ShapeTool {
         ctx.save();
         ctx.strokeStyle = annotation.color;
         ctx.lineWidth = annotation.width;
-        ctx.fillStyle = annotation.color; // For arrowhead fill
+        ctx.fillStyle = annotation.color;
 
         const center = this._getShapeCenter(annotation);
         ctx.translate(center.x, center.y);
@@ -381,7 +355,7 @@ export class ShapeTool {
         }
 
         if (annotation.shapeType !== SHAPE_TYPES.ARROW) {
-             ctx.stroke(); // Stroke only for non-arrows (arrow draws itself)
+            ctx.stroke();
         }
         ctx.restore();
     }
@@ -400,7 +374,7 @@ export class ShapeTool {
         ctx.rotate(rotation);
         ctx.translate(-center.x, -center.y);
         ctx.setLineDash(COLORS.SELECTION_DASH);
-        ctx.strokeStyle = COLORS.HANDLE_STROKE; // Use handle color for box
+        ctx.strokeStyle = COLORS.HANDLE_STROKE;
         ctx.lineWidth = 1;
         const minX = Math.min(annotation.startX, annotation.endX);
         const minY = Math.min(annotation.startY, annotation.endY);
@@ -473,17 +447,17 @@ export class ShapeTool {
         };
 
         const rotatedHandles = {};
-        const rotationCenter = { x: centerX, y: centerY }; // Center for rotation
+        const rotationCenter = { x: centerX, y: centerY };
         for (const key in unrotatedHandles) {
             rotatedHandles[key] = rotatePoint(unrotatedHandles[key], rotationCenter, rotation);
         }
         return rotatedHandles;
     }
 
-    _drawArrowhead(ctx, fromX, fromY, toX, toY, headLength, lineWidth) {
+    _drawArrowhead(ctx, fromX, fromY, toX, toY, lineWidth) {
         const angle = Math.atan2(toY - fromY, toX - fromX);
         const arrowWidth = Math.max(SHAPE_HANDLES.ARROW_MIN_WIDTH, lineWidth * SHAPE_HANDLES.ARROW_WIDTH_FACTOR);
-        headLength = Math.max(SHAPE_HANDLES.ARROW_MIN_HEAD_LENGTH, lineWidth * SHAPE_HANDLES.ARROW_HEAD_LENGTH_FACTOR);
+        const headLength = Math.max(SHAPE_HANDLES.ARROW_MIN_HEAD_LENGTH, lineWidth * SHAPE_HANDLES.ARROW_HEAD_LENGTH_FACTOR);
 
         ctx.save();
         ctx.beginPath();
@@ -491,7 +465,7 @@ export class ShapeTool {
         ctx.rotate(angle);
         ctx.moveTo(0, 0);
         ctx.lineTo(-headLength, -arrowWidth / 2);
-        ctx.lineTo(-headLength * 0.9, 0); // Indent base slightly
+        ctx.lineTo(-headLength * 0.9, 0);
         ctx.lineTo(-headLength, arrowWidth / 2);
         ctx.closePath();
         ctx.restore();
@@ -499,13 +473,12 @@ export class ShapeTool {
     }
 
     _drawArrow(ctx, fromX, fromY, toX, toY, lineWidth) {
-        const headLength = 15; // Base length, will be adjusted in _drawArrowhead
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
         ctx.lineTo(toX, toY);
         ctx.lineWidth = lineWidth;
         ctx.stroke();
-        this._drawArrowhead(ctx, fromX, fromY, toX, toY, headLength, lineWidth);
+        this._drawArrowhead(ctx, fromX, fromY, toX, toY, lineWidth);
     }
 
     deleteSelectedShape() {
@@ -514,7 +487,7 @@ export class ShapeTool {
             this.state.selectedShapeIndex = null;
             this.state.interactionMode = 'none';
             this.redrawAll();
-            this.controller.canvasManager.updateCursor(this.state.lastX, this.state.lastY); // Update cursor
+            this.controller.canvasManager.updateCursor(this.state.lastX, this.state.lastY);
         }
     }
 }

@@ -66,7 +66,7 @@ export const DEFAULT_STATE = {
 };
 
 export const DRAWING_CONFIG = {
-  SMOOTHING_FACTOR: 0.7, // Higher value = more smoothing
+  SMOOTHING_FACTOR: 0.9, // Higher value = more smoothing
   MAX_SPEED: 1500, // Calibrate based on testing
   MIN_PRESSURE: 0.5,
   MAX_PRESSURE: 1.5,

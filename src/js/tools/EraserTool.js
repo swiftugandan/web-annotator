@@ -2,20 +2,19 @@ import { ERASER_CONFIG, COLORS } from '../utils/constants.js';
 import { pointLineDistance } from '../utils/geometryUtils.js';
 
 /**
- * Handles eraser logic.
+ * Handles eraser tool functionality for removing annotations from the canvas.
  */
 export class EraserTool {
     constructor(controller) {
         this.controller = controller;
         this.state = controller.state;
-        this.ctx = controller.canvasManager.ctx; // Need context
-        this.redrawAll = controller.redrawAll.bind(controller); // Need redraw function
+        this.ctx = controller.canvasManager.ctx;
+        this.redrawAll = controller.redrawAll.bind(controller);
     }
 
     start(e) {
-        this.state.isDrawing = true; // Use isDrawing state for eraser as well
+        this.state.isDrawing = true;
         [this.state.lastX, this.state.lastY] = [e.clientX, e.clientY];
-        // No initial annotation needed for eraser
     }
 
     draw(e) {
@@ -23,35 +22,10 @@ export class EraserTool {
 
         const currentX = e.clientX;
         const currentY = e.clientY;
-        const ctx = this.ctx;
-
-        // --- Temporary Eraser Visualization --- (From original draw function)
-        ctx.save();
-        // Draw semi-transparent stroke first for visualization
-        ctx.beginPath();
-        ctx.moveTo(this.state.lastX, this.state.lastY);
-        ctx.lineTo(currentX, currentY);
-        ctx.strokeStyle = COLORS.ERASER_VISUALIZATION; 
-        ctx.lineWidth = this.state.eraserWidth || 20;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // Apply destination-out to actually "erase" visually on the current frame
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.beginPath();
-        ctx.moveTo(this.state.lastX, this.state.lastY);
-        ctx.lineTo(currentX, currentY);
-        ctx.strokeStyle = COLORS.ERASER_EFFECT; // Fully opaque black for erasing
-        ctx.lineWidth = this.state.eraserWidth || 20;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over'; // Reset composite mode
-        ctx.restore();
-        // --- End Visualization ---
-
-        // Perform actual erasure logic on annotation data
+        
+        this._visualizeEraserStroke(currentX, currentY);
+        
         if (this._eraseIntersectingPaths(currentX, currentY)) {
-            // If annotations were modified, trigger a full redraw
             this.redrawAll();
         }
 
@@ -60,139 +34,199 @@ export class EraserTool {
 
     stop() {
         this.state.isDrawing = false;
-        // Final redraw might be necessary if erasure happened on mouseup
-        this.redrawAll(); 
+        this.redrawAll();
     }
 
     /**
-     * Erases parts of drawing paths that intersect with the current eraser stroke.
-     * Modifies the annotations array directly.
-     * Returns true if any annotation was modified, false otherwise.
+     * Visualizes the eraser stroke on the canvas
+     */
+    _visualizeEraserStroke(currentX, currentY) {
+        const ctx = this.ctx;
+        const eraserWidth = this.state.eraserWidth || 20;
+        
+        ctx.save();
+        
+        // Draw semi-transparent stroke for visualization
+        ctx.beginPath();
+        ctx.moveTo(this.state.lastX, this.state.lastY);
+        ctx.lineTo(currentX, currentY);
+        ctx.strokeStyle = COLORS.ERASER_VISUALIZATION;
+        ctx.lineWidth = eraserWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Apply actual erasure effect visually
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.moveTo(this.state.lastX, this.state.lastY);
+        ctx.lineTo(currentX, currentY);
+        ctx.strokeStyle = COLORS.ERASER_EFFECT;
+        ctx.lineWidth = eraserWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+        
+        ctx.restore();
+    }
+
+    /**
+     * Erases parts of drawing paths that intersect with the eraser stroke.
+     * @returns {boolean} True if any annotation was modified
      */
     _eraseIntersectingPaths(currentX, currentY) {
-        const eraserRadius = (this.state.eraserWidth || 20) / 2; // Use radius for checks
+        const eraserRadius = (this.state.eraserWidth || 20) / 2;
         let needsRedraw = false;
         const eraserStartX = this.state.lastX;
         const eraserStartY = this.state.lastY;
-        const shapeTool = this.controller.shapeTool; // Get shape tool instance for hit detection
+        const shapeTool = this.controller.shapeTool;
 
         // Iterate backwards to allow safe removal/modification
         for (let i = this.state.annotations.length - 1; i >= 0; i--) {
             const annotation = this.state.annotations[i];
 
             if (annotation.type === 'draw') {
-                const points = annotation.points;
-                const originalLength = points.length;
-                const newSegmentsPoints = []; // Array to hold points of new segments
-                let currentSegmentPoints = [];
-                let segmentErased = false;
-
-                for (let j = 0; j < points.length; j++) {
-                    const point = points[j];
-
-                    if (j > 0) {
-                        const prevPoint = points[j - 1];
-                        const isSegmentErased = this._isSegmentIntersectingEraser(
-                            prevPoint[0], prevPoint[1],
-                            point[0], point[1],
-                            eraserStartX, eraserStartY,
-                            currentX, currentY,
-                            eraserRadius
-                        );
-
-                        if (isSegmentErased) {
-                            segmentErased = true;
-                            needsRedraw = true;
-
-                            // If current segment has points, save it
-                            if (currentSegmentPoints.length > 1) {
-                                newSegmentsPoints.push([...currentSegmentPoints]);
-                            }
-                            // Start a new segment (don't include the start point of the erased segment)
-                            currentSegmentPoints = [];
-                        } else {
-                            // Add the start point if it wasn't added yet
-                            if (currentSegmentPoints.length === 0) {
-                                currentSegmentPoints.push(prevPoint);
-                            }
-                            // Add the end point of the non-erased segment
-                            currentSegmentPoints.push(point);
-                        }
-                    } else {
-                         // Always add the very first point to the initial segment
-                         currentSegmentPoints.push(point);
-                    }
-                }
-
-                // Add the last segment if it has enough points
-                if (currentSegmentPoints.length > 1) {
-                    newSegmentsPoints.push(currentSegmentPoints);
-                }
-
-                if (segmentErased) {
-                    // Remove the original annotation
-                    this.state.annotations.splice(i, 1);
-
-                    // Add new annotations for each remaining segment
-                    for (const segmentPoints of newSegmentsPoints) {
-                        if (segmentPoints.length >= 2) {
-                            // TODO: Properly handle pressures, velocities, timestamps, control points for split segments
-                            // This is complex. For now, create simplified new annotations.
-                             this.state.annotations.push({
-                                ...annotation, // Copy basic properties like color, width
-                                points: segmentPoints,
-                                // Reset or recalculate physics/control points - simplified for now
-                                pressures: segmentPoints.map(() => 1.0),
-                                velocities: segmentPoints.map(() => 0),
-                                timestamps: segmentPoints.map(() => Date.now()),
-                                controlPoints: []
-                            });
-                        }
-                    }
-                    // Adjust selectedShapeIndex if necessary (though unlikely needed here)
-                     if (this.state.selectedShapeIndex > i) {
-                           this.state.selectedShapeIndex--;
-                     }
+                if (this._eraseFreehandDrawing(annotation, i, eraserStartX, eraserStartY, currentX, currentY, eraserRadius)) {
+                    needsRedraw = true;
                 }
             } else if (annotation.type === 'shape' && shapeTool) {
-                // --- Add Shape Erasure Logic --- 
-                let shapeErased = false;
-                const steps = ERASER_CONFIG.SAMPLE_STEPS; // Number of points to check along eraser segment
-
-                // Check multiple points along the eraser's path for intersection
-                for (let j = 0; j <= steps; j++) {
-                    const t = j / steps;
-                    const checkX = eraserStartX + t * (currentX - eraserStartX);
-                    const checkY = eraserStartY + t * (currentY - eraserStartY);
-
-                    // Use ShapeTool's hit detection. Assumes shapeTool has access to the same context.
-                    if (shapeTool._isPointInsideShape(checkX, checkY, annotation)) {
-                        // If any point on the eraser path intersects the shape, delete the whole shape
-                        this.state.annotations.splice(i, 1);
-                        needsRedraw = true;
-                        shapeErased = true;
-
-                        // If the currently selected shape is the one being erased, deselect it.
-                        if (this.state.selectedShapeIndex === i) {
-                           this.controller.deselectShape();
-                        } 
-                        // If a shape *before* the selected one is erased, adjust the index.
-                        else if (this.state.selectedShapeIndex > i) {
-                           this.state.selectedShapeIndex--;
-                        }
-                        break; // Stop checking points for this shape once erased
-                    }
+                if (this._eraseShape(annotation, i, eraserStartX, eraserStartY, currentX, currentY)) {
+                    needsRedraw = true;
                 }
-                 // --- End Shape Erasure Logic ---
             }
-            // TODO: Add erasure logic for text if desired
+            // Add support for other annotation types here if needed
         }
 
         return needsRedraw;
     }
 
     /**
-     * Checks if a line segment intersects with the eraser stroke (approximated as a line).
+     * Erases parts of a freehand drawing annotation
+     * @returns {boolean} True if the annotation was modified
+     */
+    _eraseFreehandDrawing(annotation, index, eraserStartX, eraserStartY, currentX, currentY, eraserRadius) {
+        const points = annotation.points;
+        const newSegmentsPoints = [];
+        let currentSegmentPoints = [];
+        let segmentErased = false;
+
+        for (let j = 0; j < points.length; j++) {
+            const point = points[j];
+
+            if (j > 0) {
+                const prevPoint = points[j - 1];
+                const isSegmentErased = this._isSegmentIntersectingEraser(
+                    prevPoint[0], prevPoint[1],
+                    point[0], point[1],
+                    eraserStartX, eraserStartY,
+                    currentX, currentY,
+                    eraserRadius
+                );
+
+                if (isSegmentErased) {
+                    segmentErased = true;
+
+                    // Save current segment if it has multiple points
+                    if (currentSegmentPoints.length > 1) {
+                        newSegmentsPoints.push([...currentSegmentPoints]);
+                    }
+                    // Start a new segment
+                    currentSegmentPoints = [];
+                } else {
+                    // Add the start point if it wasn't added yet
+                    if (currentSegmentPoints.length === 0) {
+                        currentSegmentPoints.push(prevPoint);
+                    }
+                    // Add the end point of the non-erased segment
+                    currentSegmentPoints.push(point);
+                }
+            } else {
+                // Always add the very first point to the initial segment
+                currentSegmentPoints.push(point);
+            }
+        }
+
+        // Add the last segment if it has enough points
+        if (currentSegmentPoints.length > 1) {
+            newSegmentsPoints.push(currentSegmentPoints);
+        }
+
+        if (segmentErased) {
+            // Remove the original annotation
+            this.state.annotations.splice(index, 1);
+
+            // Add new annotations for each remaining segment
+            this._createNewSegmentAnnotations(annotation, newSegmentsPoints);
+            
+            // Adjust selectedShapeIndex if necessary
+            this._adjustSelectionIndexAfterErasure(index);
+            
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Creates new annotation segments from erased segments
+     */
+    _createNewSegmentAnnotations(originalAnnotation, segmentsPoints) {
+        for (const segmentPoints of segmentsPoints) {
+            if (segmentPoints.length >= 2) {
+                const newAnnotation = {
+                    ...originalAnnotation,
+                    points: segmentPoints,
+                    pressures: segmentPoints.map(() => 1.0),
+                    velocities: segmentPoints.map(() => 0),
+                    timestamps: segmentPoints.map(() => Date.now()),
+                    controlPoints: []
+                };
+                this.state.annotations.push(newAnnotation);
+            }
+        }
+    }
+
+    /**
+     * Erases a shape annotation if it intersects with the eraser
+     * @returns {boolean} True if the shape was erased
+     */
+    _eraseShape(annotation, index, eraserStartX, eraserStartY, currentX, currentY) {
+        const shapeTool = this.controller.shapeTool;
+        const steps = ERASER_CONFIG.SAMPLE_STEPS;
+
+        // Check multiple points along the eraser's path for intersection
+        for (let j = 0; j <= steps; j++) {
+            const t = j / steps;
+            const checkX = eraserStartX + t * (currentX - eraserStartX);
+            const checkY = eraserStartY + t * (currentY - eraserStartY);
+
+            if (shapeTool._isPointInsideShape(checkX, checkY, annotation)) {
+                this.state.annotations.splice(index, 1);
+                
+                if (this.state.selectedShapeIndex === index) {
+                    this.controller.deselectShape();
+                } else if (this.state.selectedShapeIndex > index) {
+                    this.state.selectedShapeIndex--;
+                }
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Adjusts the selected shape index after an annotation is erased
+     */
+    _adjustSelectionIndexAfterErasure(erasedIndex) {
+        if (this.state.selectedShapeIndex > erasedIndex) {
+            this.state.selectedShapeIndex--;
+        }
+    }
+
+    /**
+     * Checks if a line segment intersects with the eraser stroke
+     * @returns {boolean} True if the segment intersects with the eraser
      */
     _isSegmentIntersectingEraser(x1, y1, x2, y2, eraserX1, eraserY1, eraserX2, eraserY2, eraserRadius) {
         // Check distance from segment endpoints to eraser line
@@ -207,9 +241,9 @@ export class EraserTool {
             return true;
         }
 
-        // More robust check: Sample points along the segment
+        // Sample points along the segment for more robust detection
         const steps = ERASER_CONFIG.SAMPLE_STEPS;
-        for (let i = 1; i < steps; i++) { // Start from 1, end before steps to avoid endpoints
+        for (let i = 1; i < steps; i++) {
             const t = i / steps;
             const x = x1 + t * (x2 - x1);
             const y = y1 + t * (y2 - y1);

@@ -18,11 +18,13 @@ export class TextTool {
         document.addEventListener('keyup', this._handleKeyUp.bind(this));
     }
 
+    //--- Event Handlers ---
+
     _handleKeyDown(e) {
         if (e.key === 'Control') {
             this.state.isCtrlPressed = true;
             if (this.state.interactionMode === 'resizing' && this.state.selectedTextIndex !== null) {
-                this.redrawAll(); // Redraw to show Ctrl indicator on handles
+                this.redrawAll();
             }
         }
     }
@@ -31,7 +33,7 @@ export class TextTool {
         if (e.key === 'Control') {
             this.state.isCtrlPressed = false;
             if (this.state.interactionMode === 'resizing' && this.state.selectedTextIndex !== null) {
-                this.redrawAll(); // Redraw to remove Ctrl indicator
+                this.redrawAll();
             }
         }
     }
@@ -42,23 +44,22 @@ export class TextTool {
         this.createTextWidget(e.clientX, e.clientY);
     }
 
-    update(e) {
+    update() {
         // Nothing to do during drag for text tool
     }
 
-    stop(e) {
+    stop() {
         // Nothing to do on mouse up for text tool
     }
 
     createTextWidget(x, y) {
-        // Create text annotation
         const textId = Date.now().toString();
         const newText = {
             type: 'text',
             id: textId,
             text: '',
-            x: x,
-            y: y,
+            x,
+            y,
             width: 200,
             height: 100,
             color: this._ensureHexColor(this.state.drawColor),
@@ -67,33 +68,24 @@ export class TextTool {
             editable: true
         };
 
-        // Add to annotations
         this.state.annotations.push(newText);
-        
-        // Create editable widget
         this._createTextEditWidget(newText);
-        
-        // Set as selected
         this.state.selectedTextIndex = this.state.annotations.length - 1;
         this.redrawAll();
     }
 
     _createTextEditWidget(textAnnotation) {
-        // Remove any existing text widget
         this._removeTextEditWidget();
         
-        // Create a text edit widget
         const textWidget = document.createElement('div');
         textWidget.id = `text-widget-${textAnnotation.id}`;
         textWidget.contentEditable = true;
         this.activeTextWidgetId = textWidget.id;
         
-        // Set the text content if it exists
         if (textAnnotation.text) {
             textWidget.innerText = textAnnotation.text;
         } else {
             textWidget.innerText = 'Type here...';
-            // Select all text when it's a placeholder
             setTimeout(() => {
                 const range = document.createRange();
                 range.selectNodeContents(textWidget);
@@ -103,11 +95,8 @@ export class TextTool {
             }, 10);
         }
         
-        // Calculate center point for transform-origin
         const centerX = textAnnotation.width / 2;
         const centerY = textAnnotation.height / 2;
-        
-        // Ensure color is in hex format
         const hexColor = this._ensureHexColor(textAnnotation.color);
         
         Object.assign(textWidget.style, {
@@ -127,27 +116,24 @@ export class TextTool {
             boxSizing: 'border-box',
             overflow: 'hidden',
             transform: `rotate(${textAnnotation.rotation || 0}rad)`,
-            transformOrigin: `${centerX}px ${centerY}px`, // Set to center of element
-            outline: 'none' // Remove the focus outline for cleaner appearance
+            transformOrigin: `${centerX}px ${centerY}px`,
+            outline: 'none'
         });
         
         document.body.appendChild(textWidget);
         
-        // Focus the text widget after a short delay to ensure it's in the DOM
         setTimeout(() => {
             textWidget.focus();
-            // Place cursor at the end if there's existing text
             if (textAnnotation.text) {
                 const range = document.createRange();
                 range.selectNodeContents(textWidget);
-                range.collapse(false); // collapse to end
+                range.collapse(false);
                 const selection = window.getSelection();
                 selection.removeAllRanges();
                 selection.addRange(range);
             }
         }, 50);
         
-        // Add event listeners
         textWidget.addEventListener('blur', () => {
             this._saveTextContent(textAnnotation, textWidget);
             this._removeTextEditWidget();
@@ -155,21 +141,16 @@ export class TextTool {
         });
         
         textWidget.addEventListener('keydown', (e) => {
-            // Only stop propagation for keys we're handling
             if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
                 textWidget.blur();
-            } else if (e.key === 'Enter' && e.shiftKey) {
-                // Allow line breaks with Shift+Enter
-            } else if (e.key === 'Enter') {
-                // Blur on Enter to save the text (similar to "done" button behavior)
+            } else if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 textWidget.blur();
             }
         });
         
-        // Click listener to stop clicks from going through to canvas
         textWidget.addEventListener('click', (e) => {
             e.stopPropagation();
         });
@@ -178,7 +159,6 @@ export class TextTool {
     _saveTextContent(textAnnotation, textWidget) {
         let content = textWidget.innerText.trim();
         
-        // Don't save the placeholder text
         if (content === 'Type here...') {
             content = '';
         }
@@ -186,7 +166,6 @@ export class TextTool {
         textAnnotation.text = content;
         textAnnotation.editable = false;
         
-        // If no text was entered, remove the annotation
         if (!content) {
             const index = this.state.annotations.findIndex(a => 
                 a.type === 'text' && a.id === textAnnotation.id);
@@ -196,7 +175,6 @@ export class TextTool {
                 if (this.state.selectedTextIndex === index) {
                     this.state.selectedTextIndex = null;
                 } else if (this.state.selectedTextIndex > index) {
-                    // Adjust index if we removed an annotation before the selected one
                     this.state.selectedTextIndex--;
                 }
             }
@@ -221,19 +199,14 @@ export class TextTool {
         this.state.dragStartX = mouseX;
         this.state.dragStartY = mouseY;
 
-        // Check if we have an active text widget - if so, this is an interaction with the widget itself
-        if (this.activeTextWidgetId) {
-            const widget = document.getElementById(this.activeTextWidgetId);
-            if (widget && widget.contains(e.target)) {
-                // User is interacting with the text widget, let it handle the event
-                return true;
-            }
+        if (this._isInteractingWithWidget(e)) {
+            return true;
         }
 
-        // 1. Check for handle interaction on selected text
         if (this.state.selectedTextIndex !== null) {
             const selectedText = this.state.annotations[this.state.selectedTextIndex];
             const handle = this.getInteractionHandleAtPoint(mouseX, mouseY, selectedText);
+            
             if (handle) {
                 this.state.activeHandle = handle;
                 if (handle === 'rotate') {
@@ -241,31 +214,26 @@ export class TextTool {
                     this.state.textCenter = this._getTextCenter(selectedText);
                 } else {
                     this.state.interactionMode = 'resizing';
-                    // Show tooltip about Ctrl+resize feature
                     this._showTooltip("Hold Ctrl while resizing to adjust font size", mouseX, mouseY);
                 }
-                return true; // Interaction started (handle)
+                return true;
             }
             
-            // Check if clicked inside the text (for moving)
             if (this._isPointInsideText(mouseX, mouseY, selectedText)) {
-                // Handle double-click to edit
                 if (e.detail === 2) {
                     this._createTextEditWidget(selectedText);
                     return true;
                 }
                 this.state.interactionMode = 'moving';
-                return true; // Interaction started (moving)
+                return true;
             }
         }
 
-        // 2. Check for click on any text (select/edit)
         const clickedTextIndex = this.getTextAtPoint(mouseX, mouseY);
         if (clickedTextIndex !== null) {
             const text = this.state.annotations[clickedTextIndex];
             this.state.selectedTextIndex = clickedTextIndex;
             
-            // Handle double-click to edit
             if (e.detail === 2) {
                 this._createTextEditWidget(text);
             } else {
@@ -276,11 +244,20 @@ export class TextTool {
             return true;
         }
 
-        // 3. Clicked on empty space - deselect and start new text
         this.state.selectedTextIndex = null;
         this.state.interactionMode = 'none';
-        this.start(e); // Start creating new text
-        return true; // We're creating a new text, so handle the event
+        this.start(e);
+        return true;
+    }
+
+    _isInteractingWithWidget(e) {
+        if (this.activeTextWidgetId) {
+            const widget = document.getElementById(this.activeTextWidgetId);
+            if (widget && widget.contains(e.target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     handleMoveInteraction(e) {
@@ -295,7 +272,6 @@ export class TextTool {
             this._rotateText(mouseX, mouseY);
         }
 
-        // Update drag start for next move event AFTER calculations
         this.state.dragStartX = mouseX;
         this.state.dragStartY = mouseY;
     }
@@ -305,7 +281,7 @@ export class TextTool {
             this.state.interactionMode = 'none';
             this.state.activeHandle = null;
             this.controller.canvasManager.updateCursor(e.clientX, e.clientY);
-            this._removeTooltip(); // Ensure tooltip is removed when interaction ends
+            this._removeTooltip();
         }
     }
 
@@ -326,15 +302,20 @@ export class TextTool {
         const center = this._getTextCenter(text);
         const rotation = text.rotation || 0;
         
-        // Store original dimensions for font scaling
         const originalWidth = text.width;
         const originalHeight = text.height;
         const originalFontSize = text.fontSize;
         
-        // Use negative rotation to convert from global (rotated) to local (unrotated) coordinates
-        // This is the inverse of what we do when drawing
-        const lastUnrotated = rotatePoint({ x: this.state.dragStartX, y: this.state.dragStartY }, center, -rotation);
-        const currentUnrotated = rotatePoint({ x: mouseX, y: mouseY }, center, -rotation);
+        const lastUnrotated = rotatePoint(
+            { x: this.state.dragStartX, y: this.state.dragStartY }, 
+            center, 
+            -rotation
+        );
+        const currentUnrotated = rotatePoint(
+            { x: mouseX, y: mouseY }, 
+            center, 
+            -rotation
+        );
         const dx = currentUnrotated.x - lastUnrotated.x;
         const dy = currentUnrotated.y - lastUnrotated.y;
         
@@ -344,6 +325,16 @@ export class TextTool {
         let x2 = text.x + text.width;
         let y2 = text.y + text.height;
         
+        this._applyHandleResize(handle, dx, dy, x1, y1, x2, y2, text);
+        
+        if (isCtrlPressed) {
+            this._adjustFontSize(text, originalWidth, originalHeight, originalFontSize);
+        }
+        
+        this.redrawAll();
+    }
+
+    _applyHandleResize(handle, dx, dy, x1, y1, x2, y2, text) {
         // Apply resizing based on handle (using unrotated coordinates)
         switch (handle) {
             case 'tl': x1 += dx; y1 += dy; break;
@@ -366,34 +357,32 @@ export class TextTool {
         text.y = y1;
         text.width = x2 - x1;
         text.height = y2 - y1;
+    }
+
+    _adjustFontSize(text, originalWidth, originalHeight, originalFontSize) {
+        const widthRatio = text.width / originalWidth;
+        const heightRatio = text.height / originalHeight;
+        const scaleRatio = (widthRatio + heightRatio) / 2;
         
-        // If ctrl is pressed, adjust the font size based on the resize proportions
-        if (isCtrlPressed) {
-            // Calculate the average scale factor (from width and height changes)
-            const widthRatio = text.width / originalWidth;
-            const heightRatio = text.height / originalHeight;
-            
-            // Use the larger of the two ratios to ensure text is always readable
-            const scaleRatio = (widthRatio + heightRatio) / 2;
-            
-            // Calculate new font size with limits
-            const newFontSize = originalFontSize * scaleRatio;
-            const minFontSize = 8;
-            const maxFontSize = 72;
-            
-            // Apply font size with min/max limits
-            text.fontSize = Math.max(minFontSize, Math.min(maxFontSize, newFontSize));
-        }
+        const newFontSize = originalFontSize * scaleRatio;
+        const minFontSize = 8;
+        const maxFontSize = 72;
         
-        this.redrawAll();
+        text.fontSize = Math.max(minFontSize, Math.min(maxFontSize, newFontSize));
     }
 
     _rotateText(mouseX, mouseY) {
         const text = this.state.annotations[this.state.selectedTextIndex];
         const center = this.state.textCenter || this._getTextCenter(text);
 
-        const prevAngle = Math.atan2(this.state.dragStartY - center.y, this.state.dragStartX - center.x);
-        const currentAngle = Math.atan2(mouseY - center.y, mouseX - center.x);
+        const prevAngle = Math.atan2(
+            this.state.dragStartY - center.y, 
+            this.state.dragStartX - center.x
+        );
+        const currentAngle = Math.atan2(
+            mouseY - center.y, 
+            mouseX - center.x
+        );
         const deltaAngle = currentAngle - prevAngle;
 
         text.rotation = (text.rotation || 0) + deltaAngle;
@@ -418,9 +407,8 @@ export class TextTool {
         if (text.type !== 'text') return null;
         
         const handlePositions = this._getHandlePositions(text);
-        const handleSize = 8; // Size of the handle hitbox
+        const handleSize = 8;
         
-        // Check each handle
         for (const [handleName, pos] of Object.entries(handlePositions)) {
             const dx = x - pos.x;
             const dy = y - pos.y;
@@ -435,7 +423,6 @@ export class TextTool {
     }
 
     _isPointInsideText(x, y, text) {
-        // For unrotated text, simple bounding box check
         if (!text.rotation) {
             return (
                 x >= text.x &&
@@ -445,12 +432,9 @@ export class TextTool {
             );
         }
         
-        // For rotated text, convert point to local coordinates
         const center = this._getTextCenter(text);
-        // Using negative rotation to convert from global to local coordinates
         const rotatedPoint = rotatePoint({ x, y }, center, -text.rotation);
         
-        // Check if rotated point is inside unrotated bounding box
         return (
             rotatedPoint.x >= text.x &&
             rotatedPoint.x <= text.x + text.width &&
@@ -474,32 +458,7 @@ export class TextTool {
 
     drawText(annotation, ctx) {
         if (!annotation.text) {
-            // Draw a placeholder empty text box if selected
-            if (annotation === this.state.annotations[this.state.selectedTextIndex]) {
-                ctx.save();
-                
-                const centerX = annotation.x + annotation.width / 2;
-                const centerY = annotation.y + annotation.height / 2;
-                
-                ctx.translate(centerX, centerY);
-                ctx.rotate(annotation.rotation || 0);
-                ctx.translate(-centerX, -centerY);
-                
-                // Draw empty box with dashed border
-                ctx.strokeStyle = this._ensureHexColor(annotation.color);
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4, 4]);
-                ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
-                
-                // Draw placeholder text
-                ctx.fillStyle = this._ensureHexColor(annotation.color);
-                ctx.font = `${annotation.fontSize}px Arial, sans-serif`;
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = 'center';
-                ctx.fillText("Text", centerX, centerY);
-                
-                ctx.restore();
-            }
+            this._drawEmptyTextBox(annotation, ctx);
             return; 
         }
         
@@ -508,21 +467,52 @@ export class TextTool {
         const centerX = annotation.x + annotation.width / 2;
         const centerY = annotation.y + annotation.height / 2;
         
-        // Apply rotation around center - use the same rotation direction as the handles
         ctx.translate(centerX, centerY);
         ctx.rotate(annotation.rotation || 0);
         ctx.translate(-centerX, -centerY);
         
-        // Draw background (optional)
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.fillRect(annotation.x, annotation.y, annotation.width, annotation.height);
         
-        // Draw text
+        this._drawTextContent(annotation, ctx);
+        
+        ctx.restore();
+    }
+
+    _drawEmptyTextBox(annotation, ctx) {
+        // Only draw placeholder if selected
+        if (annotation !== this.state.annotations[this.state.selectedTextIndex]) {
+            return;
+        }
+        
+        ctx.save();
+        
+        const centerX = annotation.x + annotation.width / 2;
+        const centerY = annotation.y + annotation.height / 2;
+        
+        ctx.translate(centerX, centerY);
+        ctx.rotate(annotation.rotation || 0);
+        ctx.translate(-centerX, -centerY);
+        
+        ctx.strokeStyle = this._ensureHexColor(annotation.color);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
+        
+        ctx.fillStyle = this._ensureHexColor(annotation.color);
+        ctx.font = `${annotation.fontSize}px Arial, sans-serif`;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText("Text", centerX, centerY);
+        
+        ctx.restore();
+    }
+
+    _drawTextContent(annotation, ctx) {
         ctx.fillStyle = this._ensureHexColor(annotation.color);
         ctx.font = `${annotation.fontSize}px Arial, sans-serif`;
         ctx.textBaseline = 'top';
         
-        // Handle multiline text
         const lines = annotation.text.split('\n');
         const lineHeight = annotation.fontSize * 1.2;
         
@@ -530,23 +520,21 @@ export class TextTool {
             const line = lines[lineIndex];
             const words = line.split(' ');
             let currentLine = '';
-            let y = annotation.y + 5 + (lineIndex * lineHeight); // Add small padding
+            let y = annotation.y + 5 + (lineIndex * lineHeight);
             
             if (y > annotation.y + annotation.height - lineHeight) {
-                break; // Stop if we've exceeded the height
+                break;
             }
             
             for (let i = 0; i < words.length; i++) {
                 const testLine = currentLine + words[i] + ' ';
                 const metrics = ctx.measureText(testLine);
-                const testWidth = metrics.width;
                 
-                if (testWidth > annotation.width - 10 && i > 0) {
+                if (metrics.width > annotation.width - 10 && i > 0) {
                     ctx.fillText(currentLine, annotation.x + 5, y);
                     currentLine = words[i] + ' ';
                     y += lineHeight;
                     
-                    // Check if we've exceeded the height
                     if (y > annotation.y + annotation.height - lineHeight) {
                         break;
                     }
@@ -555,17 +543,13 @@ export class TextTool {
                 }
             }
             
-            // Draw the last line or single line if it fits
             ctx.fillText(currentLine, annotation.x + 5, y);
         }
-        
-        ctx.restore();
     }
 
     drawSelectionHandles(annotation, ctx) {
         ctx.save();
         
-        // Draw selection outline
         ctx.strokeStyle = COLORS.TEXT_HIGHLIGHT;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
@@ -573,37 +557,30 @@ export class TextTool {
         const centerX = annotation.x + annotation.width / 2;
         const centerY = annotation.y + annotation.height / 2;
         
-        // Apply the same rotation as the text
         ctx.translate(centerX, centerY);
         ctx.rotate(annotation.rotation || 0);
         ctx.translate(-centerX, -centerY);
         
         ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
         
-        // Draw handles using the pre-calculated positions from _getHandlePositions
         const handlePositions = this._getHandlePositions(annotation);
         ctx.setLineDash([]);
         
-        // Since our handle positions are already rotated, we should restore the context first
         ctx.restore();
         ctx.save();
         
-        // Check if Ctrl is pressed for font resize indicator
         const isCtrlPressed = this.state.isCtrlPressed && this.state.interactionMode === 'resizing';
         
         Object.values(handlePositions).forEach(pos => {
             if (pos.type === 'resize') {
-                // Resize handle
                 if (isCtrlPressed) {
-                    // Special color when resizing font (Ctrl pressed)
-                    ctx.fillStyle = 'rgba(255, 165, 0, 0.7)'; // Orange for font resize
+                    ctx.fillStyle = 'rgba(255, 165, 0, 0.7)';
                     ctx.strokeStyle = 'rgba(255, 165, 0, 0.9)';
                 } else {
                     ctx.fillStyle = COLORS.HANDLE_FILL;
                     ctx.strokeStyle = COLORS.HANDLE_STROKE;
                 }
             } else {
-                // Rotation handle
                 ctx.fillStyle = COLORS.ROTATION_HANDLE_FILL;
                 ctx.strokeStyle = COLORS.ROTATION_HANDLE_STROKE;
             }
@@ -613,7 +590,6 @@ export class TextTool {
             ctx.fill();
             ctx.stroke();
             
-            // Show special indicator on handles when Ctrl is pressed
             if (isCtrlPressed && pos.type === 'resize') {
                 ctx.fillStyle = '#fff';
                 ctx.beginPath();
@@ -643,31 +619,29 @@ export class TextTool {
         
         // Corner handles (unrotated positions)
         const corners = {
-            'tl': { x: x, y: y },
-            'tr': { x: x + w, y: y },
-            'bl': { x: x, y: y + h },
+            'tl': { x, y },
+            'tr': { x: x + w, y },
+            'bl': { x, y: y + h },
             'br': { x: x + w, y: y + h }
         };
         
         // Side handles (unrotated positions)
         const sides = {
-            't': { x: x + w/2, y: y },
+            't': { x: x + w/2, y },
             'r': { x: x + w, y: y + h/2 },
             'b': { x: x + w/2, y: y + h },
-            'l': { x: x, y: y + h/2 }
+            'l': { x, y: y + h/2 }
         };
         
         // Apply rotation to corner and side handles
         for (const [key, pos] of Object.entries({...corners, ...sides})) {
-            // Using positive rotation to align with how the text box is rotated
             const rotated = rotatePoint(pos, center, rotation);
             handles[key] = { ...rotated, type: 'resize' };
         }
         
-        // Add rotation handle (top-middle, offset above the text)
-        const rotationHandleY = y - 20; // 20px above the top
+        // Add rotation handle
+        const rotationHandleY = y - 20;
         const rotationHandle = { x: x + w/2, y: rotationHandleY };
-        // Using positive rotation to be consistent with other handles
         const rotatedRotationHandle = rotatePoint(rotationHandle, center, rotation);
         handles['rotate'] = { ...rotatedRotationHandle, type: 'rotation' };
         
@@ -685,15 +659,12 @@ export class TextTool {
     }
 
     _showTooltip(message, x, y) {
-        // Remove any existing tooltips
         this._removeTooltip();
         
-        // Create tooltip element
         const tooltip = document.createElement('div');
         tooltip.id = 'text-tool-tooltip';
         tooltip.innerText = message;
         
-        // Style the tooltip
         Object.assign(tooltip.style, {
             position: 'fixed',
             left: `${x + 15}px`,
@@ -709,10 +680,8 @@ export class TextTool {
             opacity: '0.9'
         });
         
-        // Add to DOM
         document.body.appendChild(tooltip);
         
-        // Automatically hide after 3 seconds
         setTimeout(() => {
             this._removeTooltip();
         }, 3000);
@@ -725,28 +694,21 @@ export class TextTool {
         }
     }
 
-    // Helper function to ensure color is in hex format
     _ensureHexColor(color) {
-        // If it's already a hex color, return it
         if (color && color.startsWith('#')) {
             return color;
         }
         
-        // Create a temporary element to convert named colors to hex
         const tempElem = document.createElement('div');
-        tempElem.style.color = color || '#ff0000'; // Default to red if color is invalid
+        tempElem.style.color = color || '#ff0000';
         document.body.appendChild(tempElem);
         
-        // Get computed style (will convert named colors to rgb)
         const computedColor = window.getComputedStyle(tempElem).color;
         document.body.removeChild(tempElem);
         
-        // Convert rgb to hex
         if (computedColor.startsWith('rgb')) {
-            // Extract the RGB values
             const rgb = computedColor.match(/\d+/g);
             if (rgb && rgb.length >= 3) {
-                // Convert to hex
                 const hex = '#' + 
                     parseInt(rgb[0]).toString(16).padStart(2, '0') +
                     parseInt(rgb[1]).toString(16).padStart(2, '0') +
@@ -755,7 +717,6 @@ export class TextTool {
             }
         }
         
-        // If all else fails, return a safe default
         return '#ff0000';
     }
 } 
