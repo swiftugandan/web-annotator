@@ -98,6 +98,11 @@ export class CanvasManager {
         } else if (tool === TOOLS.TEXT) {
             const handled = this.controller.textTool.startInteraction(e);
             if (handled) e.stopPropagation();
+        } else if (tool === TOOLS.IMAGE) {
+            const imageHandled = this.controller.imageTool.startInteraction(e);
+            if (!imageHandled) {
+                this.controller.deselectImage();
+            }
         }
 
         if (tool !== TOOLS.SHAPES && this.state.selectedShapeIndex !== null) {
@@ -119,6 +124,8 @@ export class CanvasManager {
              this.controller.shapeTool.handleMoveInteraction(e);
         } else if (tool === TOOLS.TEXT) {
              this.controller.textTool.handleMoveInteraction(e);
+        } else if (tool === TOOLS.IMAGE) {
+            this.controller.imageTool.handleMoveInteraction(e);
         } else {
              this.updateCursor(e.clientX, e.clientY);
         }
@@ -140,6 +147,8 @@ export class CanvasManager {
             this.controller.shapeTool.stopInteraction(e);
         } else if (tool === TOOLS.TEXT) {
             this.controller.textTool.stopInteraction(e);
+        } else if (tool === TOOLS.IMAGE) {
+            this.controller.imageTool.stopInteraction(e);
         }
          this.updateCursor(e.clientX, e.clientY);
     }
@@ -152,6 +161,8 @@ export class CanvasManager {
                  this.controller.shapeTool.deleteSelectedShape();
             } else if (this.state.selectedTextIndex !== null && this.state.tool === TOOLS.TEXT) {
                  this.controller.textTool.deleteSelectedText();
+            } else if (this.state.selectedImageIndex !== null && this.state.tool === TOOLS.IMAGE) {
+                this.controller.imageTool.deleteSelectedImage();
             }
         }
     }
@@ -198,12 +209,16 @@ export class CanvasManager {
             } else if (annotation.type === 'text') {
                  // Text drawing and handles are managed by TextTool
                  // called within redrawAnnotations
+            } else if (annotation.type === 'image') {
+                 // Image drawing and handles are managed by ImageTool
+                 // called within redrawAnnotations
             }
         });
 
         // Call specialized drawing methods from managers/tools
         this.controller.shapeTool?.drawAllShapes(this.ctx);
         this.controller.textTool?.drawAllTexts(this.ctx);
+        this.controller.imageTool?.drawAllImages(this.ctx);
 
         // Note: The above structure assumes redrawAnnotations is the single point of truth.
         // If performance becomes an issue, more granular redraws might be needed.
@@ -285,6 +300,37 @@ export class CanvasManager {
                         cursorStyle = 'move';
                     } else {
                         cursorStyle = 'crosshair'; // Default for drawing new shape
+                    }
+                    break;
+                case TOOLS.IMAGE:
+                    // Check hover over handles first for selected image
+                    if (this.state.selectedImageIndex !== null) {
+                        const selectedImage = this.state.annotations[this.state.selectedImageIndex];
+                        const handle = this.controller.imageTool.getInteractionHandleAtPoint(mouseX, mouseY, selectedImage);
+                        if (handle) {
+                            if (handle === 'rotate') {
+                                cursorStyle = 'grab';
+                            } else {
+                                cursorStyle = this._getResizeCursor(handle, selectedImage.rotation || 0);
+                            }
+                            this.elements.canvas.style.cursor = cursorStyle;
+                            return;
+                        }
+                        
+                        // Check if hovering over the selected image (for moving)
+                        if (this.controller.imageTool._isPointInsideImage(mouseX, mouseY, selectedImage)) {
+                            cursorStyle = 'move';
+                            this.elements.canvas.style.cursor = cursorStyle;
+                            return;
+                        }
+                    }
+                    
+                    // Check if hovering over any image
+                    const hoveredImageIndex = this.controller.imageTool.getImageAtPoint(mouseX, mouseY);
+                    if (hoveredImageIndex !== null) {
+                        cursorStyle = 'move';
+                    } else {
+                        cursorStyle = 'pointer'; // Default for image tool
                     }
                     break;
                 default:

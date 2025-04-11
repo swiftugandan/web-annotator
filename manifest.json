@@ -32,6 +32,7 @@
           "src/js/tools/ShapeTool.js",
           "src/js/tools/EraserTool.js",
           "src/js/tools/TextTool.js",
+          "src/js/tools/ImageTool.js",
           "src/js/utils/constants.js",
           "src/js/utils/drawingUtils.js",
           "src/js/utils/geometryUtils.js"

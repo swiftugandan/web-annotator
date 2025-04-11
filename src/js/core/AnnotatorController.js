@@ -6,6 +6,7 @@ import { DrawingTool } from '../tools/DrawingTool.js';
 import { ShapeTool } from '../tools/ShapeTool.js';
 import { EraserTool } from '../tools/EraserTool.js';
 import { TextTool } from '../tools/TextTool.js';
+import { ImageTool } from '../tools/ImageTool.js';
 // TextTool logic is integrated into TextWidgetManager and CanvasManager interactions
 
 /**
@@ -30,6 +31,7 @@ export class AnnotatorController {
     this.shapeTool = new ShapeTool(this);
     this.eraserTool = new EraserTool(this);
     this.textTool = new TextTool(this);
+    this.imageTool = new ImageTool(this);
 
     // Provide redraw function (no longer needed for TextWidgetManager)
     const redrawFunc = this.redrawAll.bind(this);
@@ -63,6 +65,11 @@ export class AnnotatorController {
     if (toolName !== TOOLS.SHAPES && this.state.selectedShapeIndex !== null) {
         this.deselectShape();
     }
+    
+    // If switching to image tool, show file upload dialog
+    if (toolName === TOOLS.IMAGE) {
+        this.imageTool.createFileUploadInput();
+    }
   }
 
   redrawAll() {
@@ -80,6 +87,7 @@ export class AnnotatorController {
     this.state.annotations = [];
     this.state.selectedShapeIndex = null;
     this.state.selectedTextIndex = null;
+    this.state.selectedImageIndex = null;
     this.state.interactionMode = 'none';
     this.state.activeHandle = null;
     this.state.isDrawing = false;
@@ -101,6 +109,16 @@ export class AnnotatorController {
   deselectShape() {
       if (this.state.selectedShapeIndex !== null) {
         this.state.selectedShapeIndex = null;
+        this.state.interactionMode = 'none';
+        this.state.activeHandle = null;
+        this.redrawAll();
+        this.canvasManager.updateCursor(this.state.lastX, this.state.lastY);
+      }
+  }
+  
+  deselectImage() {
+      if (this.state.selectedImageIndex !== null) {
+        this.state.selectedImageIndex = null;
         this.state.interactionMode = 'none';
         this.state.activeHandle = null;
         this.redrawAll();

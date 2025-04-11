@@ -59,6 +59,7 @@ export class ToolbarManager {
       <button id="${TOOLS.SHAPES}" style="${this.buttonStyle}">Shapes</button>
       <button id="${TOOLS.TEXT}" style="${this.buttonStyle}">Text</button>
       <button id="${TOOLS.ERASER}" style="${this.buttonStyle}">Eraser</button>
+      <button id="${TOOLS.IMAGE}" style="${this.buttonStyle}">Image</button>
       <input type="color" id="color-picker" value="${this.state.drawColor}" style="margin-left: 10px; cursor: pointer; height: 35px;" title="Select Color">
       <button id="clear" style="${this.buttonStyle} background: #f4b400; margin-left: 10px;">Clear</button>
       <button id="close" style="${this.buttonStyle} background: #db4437; margin-left: 5px;">Close</button>
@@ -134,6 +135,7 @@ export class ToolbarManager {
     this.elements[TOOLS.DRAW].onclick = () => this.controller.setActiveTool(TOOLS.DRAW);
     this.elements[TOOLS.ERASER].onclick = () => this.controller.setActiveTool(TOOLS.ERASER);
     this.elements[TOOLS.TEXT].onclick = () => this.controller.setActiveTool(TOOLS.TEXT);
+    this.elements[TOOLS.IMAGE].onclick = () => this.controller.setActiveTool(TOOLS.IMAGE);
     this.elements[TOOLS.SHAPES].onclick = (e) => {
         this.controller.setActiveTool(TOOLS.SHAPES);
         this.toggleShapesSubmenu(e);

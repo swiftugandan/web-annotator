@@ -20,7 +20,8 @@ export const TOOLS = {
   DRAW: 'draw',
   ERASER: 'eraser',
   SHAPES: 'shapes',
-  TEXT: 'text'
+  TEXT: 'text',
+  IMAGE: 'image'
 };
 
 export const SHAPE_TYPES = {
@@ -55,6 +56,7 @@ export const DEFAULT_STATE = {
   toolbarOffsetY: 0,
   selectedShapeIndex: null,
   selectedTextIndex: null,
+  selectedImageIndex: null,
   interactionMode: 'none', // 'none', 'moving', 'resizing', 'rotating'
   activeHandle: null,      // Stores the handle being interacted with ('tl', 'tr', ..., 'rotate')
   dragStartX: 0,
@@ -92,4 +94,10 @@ export const SHAPE_HANDLES = {
   ARROW_HEAD_LENGTH_FACTOR: 5,
   ARROW_MIN_HEAD_LENGTH: 15,
   HIT_TOLERANCE: 10 // Pixel tolerance for shape hit detection (especially lines/arrows)
+};
+
+export const IMAGE_CONFIG = {
+  MAX_SIZE: 1000, // Maximum size for the larger dimension of an image
+  DEFAULT_WIDTH: 200, // Default width for pasted/inserted images
+  DEFAULT_HEIGHT: 200 // Default height for pasted/inserted images
 };
