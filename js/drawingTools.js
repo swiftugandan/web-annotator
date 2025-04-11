@@ -221,60 +221,55 @@ function drawSmoothPath(annotation, ctx) {
     const next = points[i + 1];
     
     // Apply pressure-sensitive line width (default to base width if no pressure data)
-    const pressure = annotation.pressures?.[i + 1] || 1.0;
+    // Apply width at the START of the segment for smoother transitions between widths
+    const pressure = annotation.pressures?.[i] || 1.0; // Use pressure at the start point
     ctx.lineWidth = annotation.width * pressure;
     
-    // Calculate control points
-    let cp1x, cp1y, cp2x, cp2y;
-    
-    if (i === 0) {
-      // First segment: calculate only one control point
-      cp2x = (current[0] + next[0]) / 2;
-      cp2y = (current[1] + next[1]) / 2;
-      cp1x = current[0];
-      cp1y = current[1];
-    }
-    else if (i === points.length - 2) {
-      // Last segment: only the first control point affects the curve
-      cp1x = (current[0] + points[i - 1][0]) / 2;
-      cp1y = (current[1] + points[i - 1][1]) / 2;
-      cp2x = next[0];
-      cp2y = next[1];
-    }
-    else {
-      // Middle segments: calculate both control points
+    // Retrieve stored control points if available
+    const storedCp1 = annotation.controlPoints?.[i]?.cp1;
+    const storedCp2 = annotation.controlPoints?.[i]?.cp2;
+
+    if (storedCp1 && storedCp2) {
+      // Use stored control points for maximum fidelity with live drawing
+      ctx.bezierCurveTo(storedCp1.x, storedCp1.y, storedCp2.x, storedCp2.y, next[0], next[1]);
+    } else {
+      // Fallback: Recalculate control points if not stored (e.g., older annotations)
+      // This uses a simplified logic similar to the original live drawing's end segment
+      // which might be less smooth than the original fallback but closer to the live feel.
+      let cp1x, cp1y, cp2x, cp2y;
       const prev = points[i - 1];
-      const afterNext = points[i + 2];
-      
-      // Get velocity for physics-based adjustments
-      const currentVelocity = annotation.velocities?.[i] || 0;
-      const nextVelocity = annotation.velocities?.[i+1] || 0;
-      
-      // Dynamic tension based on velocity - faster strokes get more smoothing
-      const segmentTension = velocityAdjustedTension * 
-        (1 - Math.min(Math.max(currentVelocity, nextVelocity) / 2000, 0.5));
-      
-      // Calculate control points with dynamic tension adjustment
-      cp1x = current[0] + (next[0] - prev[0]) * segmentTension;
-      cp1y = current[1] + (next[1] - prev[1]) * segmentTension;
-      
-      cp2x = next[0] - (afterNext[0] - current[0]) * segmentTension;
-      cp2y = next[1] - (afterNext[1] - current[1]) * segmentTension;
+
+      if (i === 0) {
+          // First segment: Use midpoint for cp2
+          cp1x = current[0];
+          cp1y = current[1];
+          cp2x = (current[0] + next[0]) / 2;
+          cp2y = (current[1] + next[1]) / 2;
+      } else {
+          // Subsequent segments: Use previous point to calculate cp1, midpoint for cp2
+          // Adjust tension based on velocity like in the live draw
+          const currentVelocity = annotation.velocities?.[i] || 0;
+          const nextVelocity = annotation.velocities?.[i+1] || 0;
+           let segmentTension = velocityAdjustedTension * (1 - Math.min(Math.max(currentVelocity, nextVelocity) / 2000, 0.5));
+
+          cp1x = current[0] + (next[0] - prev[0]) * segmentTension;
+          cp1y = current[1] + (next[1] - prev[1]) * segmentTension;
+          cp2x = (current[0] + next[0]) / 2;
+          cp2y = (current[1] + next[1]) / 2;
+      }
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, next[0], next[1]);
     }
-    
-    // Draw cubic Bezier curve segment
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, next[0], next[1]);
-    
-    // Store control points for potential future use
-    if (!annotation.controlPoints[i]) {
-      annotation.controlPoints[i] = {
-        cp1: { x: cp1x, y: cp1y },
-        cp2: { x: cp2x, y: cp2y }
-      };
-    }
+
+    // Stroke each segment individually if we want varying line width per segment
+    // This ensures the lineWidth set above is applied to this specific segment
+    ctx.stroke();
+    // Begin a new path for the next segment to allow its width to be set independently
+    ctx.beginPath();
+    ctx.moveTo(next[0], next[1]);
   }
   
-  ctx.stroke();
+  // No need for a final stroke here as each segment is stroked individually
+  // ctx.stroke(); 
 }
 
 /**
@@ -490,21 +485,23 @@ function drawTextHighlight(annotation, ctx) {
 function redrawAnnotations(ctx, annotations, state, canvas, selectedShapeIndex = null) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  // Draw all saved annotations
-  for (let i = 0; i < annotations.length; i++) {
-    const annotation = annotations[i];
+  annotations.forEach((annotation, index) => {
     if (annotation.type === 'draw') {
-      drawPath(annotation, ctx);
+      drawSmoothPath(annotation, ctx); // Ensure this calls the modified drawSmoothPath
     } else if (annotation.type === 'text') {
       drawText(annotation, ctx, state);
+      // Optional: Add highlight/selection indication for text
+      // if (state.activeTextAnnotation === annotation) {
+      //   drawTextHighlight(annotation, ctx);
+      // }
     } else if (annotation.type === 'shape') {
-      drawShape(annotation, ctx);
-      // Draw selection handles if this shape is selected
-      if (i === selectedShapeIndex) {
-        drawSelectionHandles(annotation, ctx);
-      }
+        drawShape(annotation, ctx);
+        // Draw selection handles if this shape is selected
+        if (index === selectedShapeIndex) {
+            drawSelectionHandles(annotation, ctx);
+        }
     }
-  }
+  });
 }
 
 /**

@@ -307,43 +307,58 @@
         const dx = mouseX - state.dragStartX;
         const dy = mouseY - state.dragStartY;
 
-        // TODO: Resizing rotated shapes requires transforming dx/dy based on rotation.
-        // This is complex and not fully implemented here.
-        // For now, resizing might behave unexpectedly on rotated shapes.
+        if (shape.shapeType === 'line' || shape.shapeType === 'arrow') {
+            // Special handling for resizing lines/arrows: modify start OR end point
+            switch (state.activeHandle) {
+                // Handles modifying the START point
+                case 'tl': shape.startX += dx; shape.startY += dy; break;
+                case 't':  shape.startY += dy; break;
+                case 'l':  shape.startX += dx; break;
+                case 'bl': shape.startX += dx; shape.startY += dy; break; // Treat BL as moving start point
 
-        // Adjust coordinates based on the handle being dragged
-        switch (state.activeHandle) {
-          case 'tl':
-            shape.startX += dx;
-            shape.startY += dy;
-            break;
-          case 'tr':
-            shape.endX += dx;
-            shape.startY += dy;
-            break;
-          case 'bl':
-            shape.startX += dx;
-            shape.endY += dy;
-            break;
-          case 'br':
-            shape.endX += dx;
-            shape.endY += dy;
-            break;
-          case 't':
-             shape.startY += dy;
-             break;
-          case 'b':
-             shape.endY += dy;
-             break;
-          case 'l':
-             shape.startX += dx;
-             break;
-          case 'r':
-             shape.endX += dx;
-             break;
+                // Handles modifying the END point
+                case 'tr': shape.endX += dx; shape.endY += dy; break; // Treat TR as moving end point
+                case 'br': shape.endX += dx; shape.endY += dy; break;
+                case 'b':  shape.endY += dy; break;
+                case 'r':  shape.endX += dx; break;
+            }
+        } else {
+            // Original logic for rectangles/circles
+            // Adjust coordinates based on the handle being dragged
+            switch (state.activeHandle) {
+                case 'tl':
+                    shape.startX += dx;
+                    shape.startY += dy;
+                    break;
+                case 'tr':
+                    shape.endX += dx;
+                    shape.startY += dy;
+                    break;
+                case 'bl':
+                    shape.startX += dx;
+                    shape.endY += dy;
+                    break;
+                case 'br':
+                    shape.endX += dx;
+                    shape.endY += dy;
+                    break;
+                case 't':
+                     shape.startY += dy;
+                     break;
+                case 'b':
+                     shape.endY += dy;
+                     break;
+                case 'l':
+                     shape.startX += dx;
+                     break;
+                case 'r':
+                     shape.endX += dx;
+                     break;
+            }
         }
          // Prevent shape inversion (width/height becoming negative)
-        if (shape.shapeType !== 'line') { // Lines can invert
+         // This normalization is primarily for rect/circle during drag, might remove if causing issues
+         if (shape.shapeType === 'rectangle' || shape.shapeType === 'circle') {
              if (shape.endX < shape.startX) [shape.startX, shape.endX] = [shape.endX, shape.startX];
              if (shape.endY < shape.startY) [shape.startY, shape.endY] = [shape.endY, shape.startY];
          }
@@ -388,20 +403,18 @@
         if (state.selectedShapeIndex !== null) {
              const shape = state.annotations[state.selectedShapeIndex];
              // Normalize rectangle/circle coordinates after resize/move
-             if (shape.shapeType === 'rectangle' || shape.shapeType === 'circle') {
-                 if (state.interactionMode === 'resizing') {
-                   // TODO: Properly normalize coordinates after resizing a rotated shape
-                   const x1 = Math.min(shape.startX, shape.endX);
-                   const y1 = Math.min(shape.startY, shape.endY);
-                   const x2 = Math.max(shape.startX, shape.endX);
-                   const y2 = Math.max(shape.startY, shape.endY);
-                   shape.startX = x1;
-                   shape.startY = y1;
-                   shape.endX = x2;
-                   shape.endY = y2;
-                 }
-                 redrawAll(); // Redraw with normalized coords
+             if ((shape.shapeType === 'rectangle' || shape.shapeType === 'circle') && state.interactionMode === 'resizing' && !(shape.rotation)) {
+                 // TODO: Properly normalize coordinates after resizing a rotated shape
+                 const x1 = Math.min(shape.startX, shape.endX);
+                 const y1 = Math.min(shape.startY, shape.endY);
+                 const x2 = Math.max(shape.startX, shape.endX);
+                 const y2 = Math.max(shape.startY, shape.endY);
+                 shape.startX = x1;
+                 shape.startY = y1;
+                 shape.endX = x2;
+                 shape.endY = y2;
              }
+             redrawAll(); // Redraw with normalized coords
          }
         state.interactionMode = 'none';
         state.activeHandle = null;
