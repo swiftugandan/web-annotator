@@ -1,22 +1,34 @@
 # Chrome Extension: Transparent Annotation Overlay
 
-A comprehensive guide to building a Chrome extension that overlays a transparent annotation canvas on any webpage, lets users annotate directly.
+A comprehensive guide to the Chrome extension that overlays a transparent annotation canvas on any webpage, allowing users to annotate directly on web content.
 
 ---
 
 ## 📋 Features Overview
 
 - **Transparent Overlay:** Inject a transparent canvas over the current webpage.
-- **Annotate Directly:** Draw, highlight, or add text directly on the webpage.
+- **Multiple Annotation Tools:**
+  - Freehand Drawing: Draw anywhere on the page
+  - Text Tool: Add text annotations 
+  - Shape Tool: Create rectangles, circles, lines, and arrows
+  - Image Tool: Add images to the overlay
+  - Eraser Tool: Remove parts of annotations
+- **Interactive Elements:** 
+  - Resize, move, and edit existing annotations
+  - Color selection for drawings and shapes
+  - Toolbar positioning via drag and drop
 
 ---
 
-## 🧩 Updated Architecture Diagram
+## 🧩 Architecture Diagram
 
 ```mermaid
 flowchart TD
-    A[User clicks extension] --> B[Inject transparent canvas]
-    B --> C[User annotates webpage]
+    A[User clicks extension] --> B[background.js injects content script]
+    B --> C[AnnotatorController initializes]
+    C --> D1[CanvasManager] & D2[ToolbarManager] & D3[Tools]
+    D3 --> E1[DrawingTool] & E2[ShapeTool] & E3[TextTool] & E4[EraserTool] & E5[ImageTool]
+    E1 & E2 & E3 & E4 & E5 --> F[User annotates webpage]
 ```
 
 ---
@@ -25,124 +37,119 @@ flowchart TD
 
 | Component             | Technology                     |
 |-----------------------|--------------------------------|
-| Browser Extension     | Chrome Extensions API          |
+| Browser Extension     | Chrome Extensions API (MV3)    |
 | Overlay & Annotation  | HTML Canvas API                |
+| Architecture          | OOP JavaScript (ES Modules)    |
+| Drawing               | PerfectFreehand algorithm      |
 
 ---
 
-## 🧑‍💻 Complete Implementation
+## 🧑‍💻 Implementation Details
 
-### 1. **`manifest.json`**
+### Core Architecture
+
+The extension follows an object-oriented architecture with clear separation of concerns:
+
+1. **AnnotatorController**: Main orchestrator that initializes and coordinates all components
+2. **Managers**:
+   - **CanvasManager**: Handles canvas creation, rendering, and event management
+   - **ToolbarManager**: Creates and manages the UI toolbar and its interactions
+3. **Tools**:
+   - **DrawingTool**: Implements freehand drawing functionality
+   - **ShapeTool**: Handles creation and manipulation of shapes (rectangles, circles, lines, arrows)
+   - **TextTool**: Manages text annotations and editing
+   - **EraserTool**: Implements eraser functionality
+   - **ImageTool**: Handles image upload and placement
+4. **Utilities**:
+   - **constants.js**: Defines application constants and default state
+   - **drawingUtils.js**: Drawing-related utility functions
+   - **geometryUtils.js**: Geometry calculations for shapes
+   - **perfectFreehand.js**: Algorithm for smooth freehand drawing
+
+### Key Files
+
+#### `manifest.json`
+
+The manifest defines extension metadata, permissions, and resource access:
 
 ```json
 {
   "manifest_version": 3,
   "name": "Transparent Screenshot Annotator",
-  "version": "1.0",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "version": "1.1",
+  "description": "Overlay a transparent annotation canvas on any webpage (OOP Refactor)",
+  "permissions": ["activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Annotate Page",
-    "default_icon": "icon.png"
+    "default_icon": {/* icon definitions */}
   },
   "background": {
     "service_worker": "background.js"
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js", "js/textWidget.js", "js/uiElements.js", "js/drawingTools.js"],
+      "resources": [
+          "content.js",
+          "src/js/core/AnnotatorController.js",
+          "src/js/core/CanvasManager.js",
+          "src/js/core/ToolbarManager.js",
+          "src/js/tools/DrawingTool.js",
+          "src/js/tools/ShapeTool.js",
+          "src/js/tools/EraserTool.js",
+          "src/js/tools/TextTool.js",
+          "src/js/tools/ImageTool.js",
+          "src/js/utils/constants.js",
+          "src/js/utils/drawingUtils.js",
+          "src/js/utils/geometryUtils.js",
+          "src/js/utils/perfectFreehand.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ]
 }
 ```
 
----
+#### `background.js`
 
-### 2. **`background.js`**
+Implements a `BackgroundController` that:
+- Responds to extension icon clicks
+- Ensures the content script is injected only once per tab
+- Handles any extension-level messaging
 
-Injects the content script when the extension icon is clicked.
+#### `content.js`
 
-```js
-chrome.action.onClicked.addListener((tab) => {
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["content.js"]
-  });
-});
-```
+Entry point script that:
+- Prevents multiple injections with a global flag
+- Dynamically imports the AnnotatorController
+- Initializes the application
 
----
+#### `AnnotatorController.js`
 
-### 3. **`content.js`**
-
-Injects a transparent canvas overlay and provides annotation tools.
-
-```js
-(async function() {
-  // Avoid multiple injections
-  if (window.__annotatorInjected) return;
-  window.__annotatorInjected = true;
-
-  // Load necessary scripts (e.g., textWidget.js, uiElements.js, drawingTools.js)
-  // Assume these are loaded via web_accessible_resources
-  const { createTextWidget, removeTextWidget, setAnnotations, setRedrawFunction } = await import(chrome.runtime.getURL('js/textWidget.js'));
-  const { createUIElements, Z_INDEX } = await import(chrome.runtime.getURL('js/uiElements.js'));
-  const { startDrawing, draw, redrawAnnotations, startShape, updateShape, endShape, drawShape } = await import(chrome.runtime.getURL('js/drawingTools.js'));
-
-  // Constants (COLORS, TOOLS)
-  // ... state management ...
-  // ... createUIElements call ...
-  // ... setup event listeners ...
-
-  // Add simple toolbar
-  const toolbar = document.createElement('div');
-  toolbar.style.position = 'fixed';
-  toolbar.style.top = '10px';
-  toolbar.style.right = '10px';
-  toolbar.style.zIndex = 1000000;
-  toolbar.style.background = '#fff';
-  toolbar.style.padding = '8px';
-  toolbar.style.borderRadius = '4px';
-  toolbar.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
-  toolbar.style.fontFamily = 'sans-serif';
-  toolbar.innerHTML = `
-    <button id="draw">Draw</button>
-    <input type="color" id="color-picker" value="#ff0000" title="Drawing Color">
-    <button id="shapes">Shapes</button>
-    <button id="text">Text</button>
-    <button id="eraser">Eraser</button>
-    <button id="clear">Clear</button>
-    <button id="close">Close</button>
-  `;
-  document.body.appendChild(toolbar);
-
-  // Tool actions (Draw, Text, Shapes, Eraser, Clear, Close)
-  // ... (event listeners for buttons as in current implementation)
-
-})();
-```
+The central controller that:
+- Initializes all managers and tools
+- Maintains application state
+- Provides methods for tool activation, annotation management, and cleanup
+- Coordinates communication between components
 
 ---
 
 ## 🔒 Security Considerations
 
-- **Data Privacy:** Inform users if any data is stored locally (e.g., via `chrome.storage`).
-
----
-
-## 🎨 UI Mockup
-
-![Transparent Annotation Overlay](https://picsum.photos/800/400)
+- **Injection Protection:** The extension uses checks to prevent multiple injections
+- **DOM Isolation:** Canvas overlay doesn't interfere with page content
+- **No External Dependencies:** All code is self-contained within the extension
 
 ---
 
 ## 🚀 Future Enhancements
 
-- User authentication (if needed)
-- Option to save/load annotations locally
-- More annotation tools (arrows, etc.)
-- Export annotations (e.g., as JSON)
+- **Save/Load Annotations:** Ability to save annotations for later editing
+- **Annotation Export:** Export annotations as images or JSON data
+- **Enhanced Text Formatting:** Additional text styling options
+- **Annotation Groups:** Group related annotations together
+- **Undo/Redo:** Add support for action history
+- **Collaboration:** Real-time shared annotations (would require backend)
 
 ---
 
@@ -150,6 +157,7 @@ Injects a transparent canvas overlay and provides annotation tools.
 
 - [Chrome Extensions Developer Guide](https://developer.chrome.com/docs/extensions/)
 - [HTML Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
+- [Perfect Freehand](https://github.com/steveruizok/perfect-freehand)
 
 ---
 
