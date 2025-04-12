@@ -68,15 +68,104 @@ export const DEFAULT_STATE = {
 };
 
 export const DRAWING_CONFIG = {
-  SMOOTHING_FACTOR: 0.9, // Higher value = more smoothing
+  SMOOTHING_FACTOR: 0.8, // Higher value = more smoothing (Decreased from 0.9 for responsiveness)
   MAX_SPEED: 1500, // Calibrate based on testing
-  MIN_PRESSURE: 0.5,
-  MAX_PRESSURE: 1.5,
-  TENSION: 0.4, // Base tension for spline drawing
+  MIN_PRESSURE: 0.3, // Decreased from 0.5
+  MAX_PRESSURE: 1.7, // Increased from 1.5
+  TENSION: 0.2, // Base tension for spline drawing (Reduced from 0.4)
   HIGH_VELOCITY_THRESHOLD: 1000,
   VELOCITY_TENSION_FACTOR: 0.8,
   VELOCITY_TENSION_SCALE: 2000,
   VELOCITY_TENSION_REDUCTION_MAX: 0.5
+};
+
+// Easing functions for tapers
+const easingFunctions = {
+  linear: t => t, 
+  easeIn: t => t * t,
+  easeOut: t => t * (2 - t),
+  easeInOut: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  elastic: t => {
+    const c4 = (2 * Math.PI) / 3;
+    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+  bounce: t => {
+    const n1 = 7.5625;
+    const d1 = 2.75;
+    if (t < 1 / d1) return n1 * t * t;
+    if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+    if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+    return n1 * (t -= 2.625 / d1) * t + 0.984375;
+  }
+};
+
+// Preset configurations for perfect-freehand
+export const PERFECT_FREEHAND_PRESETS = {
+  DEFAULT: {
+    SIZE: 8,
+    THINNING: 0.5,
+    SMOOTHING: 0.5,
+    STREAMLINE: 0.5,
+    SIMULATE_PRESSURE: true,
+    START: { CAP: true, TAPER: 0, EASING: easingFunctions.linear },
+    END: { CAP: true, TAPER: 0, EASING: easingFunctions.linear }
+  },
+  TAPERED_ENDS: {
+    SIZE: 8,
+    THINNING: 0.5,
+    SMOOTHING: 0.5,
+    STREAMLINE: 0.5,
+    SIMULATE_PRESSURE: true,
+    START: { CAP: false, TAPER: 20, EASING: easingFunctions.easeIn },
+    END: { CAP: false, TAPER: 20, EASING: easingFunctions.easeOut }
+  },
+  BRUSH_PEN: {
+    SIZE: 10,
+    THINNING: 0.7,
+    SMOOTHING: 0.5,
+    STREAMLINE: 0.5,
+    SIMULATE_PRESSURE: true,
+    START: { CAP: true, TAPER: 0, EASING: easingFunctions.linear },
+    END: { CAP: true, TAPER: 0, EASING: easingFunctions.linear }
+  },
+  FOUNTAIN_PEN: {
+    SIZE: 8,
+    THINNING: 0.6,
+    SMOOTHING: 0.5,
+    STREAMLINE: 0.5,
+    SIMULATE_PRESSURE: true,
+    START: { CAP: false, TAPER: 15, EASING: easingFunctions.easeIn },
+    END: { CAP: false, TAPER: 15, EASING: easingFunctions.easeOut }
+  },
+  BALLPOINT: {
+    SIZE: 6,
+    THINNING: 0.3,
+    SMOOTHING: 0.5,
+    STREAMLINE: 0.5,
+    SIMULATE_PRESSURE: true,
+    START: { CAP: true, TAPER: 0, EASING: easingFunctions.linear },
+    END: { CAP: true, TAPER: 0, EASING: easingFunctions.linear }
+  }
+};
+
+// Configuration for perfect-freehand algorithm
+export const PERFECT_FREEHAND_CONFIG = {
+  SIZE: 8,              // Base size (diameter) of the stroke
+  THINNING: 0.5,        // Effect of pressure on the stroke's size
+  SMOOTHING: 0.5,       // How much to soften the stroke's edges
+  STREAMLINE: 0.5,      // How much to streamline the stroke
+  SIMULATE_PRESSURE: true, // Whether to simulate pressure based on velocity
+  USE_PERFECT_FREEHAND: true, // Toggle between perfect-freehand and legacy drawing
+  START: {
+    CAP: true,          // Whether to draw a cap at the start
+    TAPER: 20,           // The distance to taper from the start (pixels, or true for full stroke length)
+    EASING: easingFunctions.easeIn,     // Easing function for the taper
+  },
+  END: {
+    CAP: true,          // Whether to draw a cap at the end
+    TAPER: 20,           // The distance to taper at the end (pixels, or true for full stroke length)
+    EASING: easingFunctions.easeOut,     // Easing function for the taper
+  }
 };
 
 export const ERASER_CONFIG = {

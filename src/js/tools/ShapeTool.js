@@ -308,14 +308,17 @@ export class ShapeTool {
     //--- Drawing Shapes and Handles ---
 
     drawAllShapes(ctx) {
-        this.state.annotations.forEach((annotation, index) => {
-            if (annotation.type === 'shape') {
-                this.drawShape(annotation, ctx);
-                if (index === this.state.selectedShapeIndex) {
-                    this.drawSelectionHandles(annotation, ctx);
-                }
-            }
+        const shapes = this.state.annotations.filter(annotation => annotation.type === 'shape');
+        
+        // First draw all shapes (no handles)
+        shapes.forEach(annotation => {
+            this.drawShape(annotation, ctx);
         });
+        
+        // If a shape is selected, draw its handles
+        if (this.state.selectedShapeIndex !== null) {
+            this.drawShapeHandles(ctx);
+        }
     }
 
     drawShape(annotation, ctx) {
@@ -360,59 +363,14 @@ export class ShapeTool {
         ctx.restore();
     }
 
-    drawSelectionHandles(annotation, ctx) {
-        const handlePositions = this._getHandlePositions(annotation);
-        const handleSize = SHAPE_HANDLES.SIZE;
-        const halfHandleSize = handleSize / 2;
-        const rotationHandleRadius = SHAPE_HANDLES.ROTATION_RADIUS;
-        const center = this._getShapeCenter(annotation);
-        const rotation = annotation.rotation || 0;
-
-        // Draw dashed bounding box (rotated)
-        ctx.save();
-        ctx.translate(center.x, center.y);
-        ctx.rotate(rotation);
-        ctx.translate(-center.x, -center.y);
-        ctx.setLineDash(COLORS.SELECTION_DASH);
-        ctx.strokeStyle = COLORS.HANDLE_STROKE;
-        ctx.lineWidth = 1;
-        const minX = Math.min(annotation.startX, annotation.endX);
-        const minY = Math.min(annotation.startY, annotation.endY);
-        const width = Math.abs(annotation.endX - annotation.startX);
-        const height = Math.abs(annotation.endY - annotation.startY);
-        ctx.strokeRect(minX, minY, width, height);
-        ctx.setLineDash([]);
-        ctx.restore();
-
-        // Draw handles at rotated positions
-        for (const key in handlePositions) {
-            const pos = handlePositions[key];
-            if (key === 'rotate') {
-                // Draw rotation handle
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, rotationHandleRadius, 0, Math.PI * 2);
-                ctx.fillStyle = COLORS.ROTATION_HANDLE_FILL;
-                ctx.fill();
-                ctx.strokeStyle = COLORS.ROTATION_HANDLE_STROKE;
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // Draw line from top-center handle to rotation handle
-                const topCenterHandle = handlePositions['t'];
-                ctx.beginPath();
-                ctx.moveTo(topCenterHandle.x, topCenterHandle.y);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.strokeStyle = COLORS.ROTATION_LINE;
-                ctx.stroke();
-            } else {
-                // Draw resize handles
-                ctx.fillStyle = COLORS.HANDLE_FILL;
-                ctx.strokeStyle = COLORS.HANDLE_STROKE;
-                ctx.lineWidth = 1;
-                ctx.fillRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
-                ctx.strokeRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
-            }
-        }
+    drawShapeHandles(ctx) {
+        if (this.state.selectedShapeIndex === null) return;
+        
+        const selectedShape = this.state.annotations[this.state.selectedShapeIndex];
+        if (!selectedShape || selectedShape.type !== 'shape') return;
+        
+        // Draw handles
+        this._drawShapeSelectionHandles(selectedShape, ctx);
     }
 
     //--- Helper Methods ---
@@ -488,6 +446,67 @@ export class ShapeTool {
             this.state.interactionMode = 'none';
             this.redrawAll();
             this.controller.canvasManager.updateCursor(this.state.lastX, this.state.lastY);
+        }
+    }
+
+    /**
+     * Draw selection handles for a selected shape
+     * @param {Object} annotation - The shape annotation
+     * @param {CanvasRenderingContext2D} ctx - The canvas 2D context
+     * @private
+     */
+    _drawShapeSelectionHandles(annotation, ctx) {
+        const handlePositions = this._getHandlePositions(annotation);
+        const handleSize = SHAPE_HANDLES.SIZE;
+        const halfHandleSize = handleSize / 2;
+        const rotationHandleRadius = SHAPE_HANDLES.ROTATION_RADIUS;
+        const center = this._getShapeCenter(annotation);
+        const rotation = annotation.rotation || 0;
+
+        // Draw dashed bounding box (rotated)
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rotation);
+        ctx.translate(-center.x, -center.y);
+        ctx.setLineDash(COLORS.SELECTION_DASH);
+        ctx.strokeStyle = COLORS.HANDLE_STROKE;
+        ctx.lineWidth = 1;
+        const minX = Math.min(annotation.startX, annotation.endX);
+        const minY = Math.min(annotation.startY, annotation.endY);
+        const width = Math.abs(annotation.endX - annotation.startX);
+        const height = Math.abs(annotation.endY - annotation.startY);
+        ctx.strokeRect(minX, minY, width, height);
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Draw handles at rotated positions
+        for (const key in handlePositions) {
+            const pos = handlePositions[key];
+            if (key === 'rotate') {
+                // Draw rotation handle
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, rotationHandleRadius, 0, Math.PI * 2);
+                ctx.fillStyle = COLORS.ROTATION_HANDLE_FILL;
+                ctx.fill();
+                ctx.strokeStyle = COLORS.ROTATION_HANDLE_STROKE;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Draw line from top-center handle to rotation handle
+                const topCenterHandle = handlePositions['t'];
+                ctx.beginPath();
+                ctx.moveTo(topCenterHandle.x, topCenterHandle.y);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.strokeStyle = COLORS.ROTATION_LINE;
+                ctx.stroke();
+            } else {
+                // Draw resize handles
+                ctx.fillStyle = COLORS.HANDLE_FILL;
+                ctx.strokeStyle = COLORS.HANDLE_STROKE;
+                ctx.lineWidth = 1;
+                ctx.fillRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
+                ctx.strokeRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
+            }
         }
     }
 }

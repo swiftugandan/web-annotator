@@ -312,14 +312,17 @@ export class ImageTool {
     //--- Drawing ---
 
     drawAllImages(ctx) {
-        this.state.annotations.forEach((annotation, index) => {
-            if (annotation.type === 'image') {
-                this.drawImage(annotation, ctx);
-                if (index === this.state.selectedImageIndex) {
-                    this.drawSelectionHandles(annotation, ctx);
-                }
-            }
+        const images = this.state.annotations.filter(annotation => annotation.type === 'image');
+        
+        // First draw all images (no handles)
+        images.forEach(annotation => {
+            this.drawImage(annotation, ctx);
         });
+        
+        // If an image is selected, draw its handles
+        if (this.state.selectedImageIndex !== null) {
+            this.drawImageHandles(ctx);
+        }
     }
 
     drawImage(annotation, ctx) {
@@ -365,7 +368,17 @@ export class ImageTool {
         ctx.restore();
     }
 
-    drawSelectionHandles(annotation, ctx) {
+    drawImageHandles(ctx) {
+        if (this.state.selectedImageIndex === null) return;
+        
+        const selectedImage = this.state.annotations[this.state.selectedImageIndex];
+        if (!selectedImage || selectedImage.type !== 'image') return;
+        
+        // Draw handles
+        this._drawImageSelectionHandles(selectedImage, ctx);
+    }
+
+    _drawImageSelectionHandles(annotation, ctx) {
         const handlePositions = this._getHandlePositions(annotation);
         const handleSize = SHAPE_HANDLES.SIZE;
         const halfHandleSize = handleSize / 2;
@@ -381,11 +394,7 @@ export class ImageTool {
         ctx.setLineDash(COLORS.SELECTION_DASH);
         ctx.strokeStyle = COLORS.HANDLE_STROKE;
         ctx.lineWidth = 1;
-        const minX = Math.min(annotation.startX, annotation.endX);
-        const minY = Math.min(annotation.startY, annotation.endY);
-        const width = Math.abs(annotation.endX - annotation.startX);
-        const height = Math.abs(annotation.endY - annotation.startY);
-        ctx.strokeRect(minX, minY, width, height);
+        ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
         ctx.setLineDash([]);
         ctx.restore();
 

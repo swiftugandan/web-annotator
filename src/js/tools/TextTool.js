@@ -1,4 +1,4 @@
-import { COLORS, Z_INDEX } from '../utils/constants.js';
+import { COLORS, Z_INDEX, TOOLS, SHAPE_HANDLES } from '../utils/constants.js';
 import { rotatePoint } from '../utils/geometryUtils.js';
 
 /**
@@ -446,14 +446,17 @@ export class TextTool {
     //--- Drawing ---
 
     drawAllTexts(ctx) {
-        this.state.annotations.forEach((annotation, index) => {
-            if (annotation.type === 'text') {
-                this.drawText(annotation, ctx);
-                if (index === this.state.selectedTextIndex) {
-                    this.drawSelectionHandles(annotation, ctx);
-                }
-            }
+        const texts = this.state.annotations.filter(annotation => annotation.type === 'text');
+        
+        // First draw all texts (no handles)
+        texts.forEach(annotation => {
+            this.drawText(annotation, ctx);
         });
+        
+        // If a text is selected, draw its handles
+        if (this.state.selectedTextIndex !== null) {
+            this.drawTextHandles(ctx);
+        }
     }
 
     drawText(annotation, ctx) {
@@ -547,58 +550,68 @@ export class TextTool {
         }
     }
 
-    drawSelectionHandles(annotation, ctx) {
-        ctx.save();
+    drawTextHandles(ctx) {
+        if (this.state.selectedTextIndex === null) return;
         
-        ctx.strokeStyle = COLORS.TEXT_HIGHLIGHT;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
+        const selectedText = this.state.annotations[this.state.selectedTextIndex];
+        if (!selectedText || selectedText.type !== 'text') return;
         
-        const centerX = annotation.x + annotation.width / 2;
-        const centerY = annotation.y + annotation.height / 2;
-        
-        ctx.translate(centerX, centerY);
-        ctx.rotate(annotation.rotation || 0);
-        ctx.translate(-centerX, -centerY);
-        
-        ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
-        
+        // Draw handles
+        this._drawTextSelectionHandles(selectedText, ctx);
+    }
+
+    _drawTextSelectionHandles(annotation, ctx) {
         const handlePositions = this._getHandlePositions(annotation);
-        ctx.setLineDash([]);
-        
-        ctx.restore();
+        const handleSize = SHAPE_HANDLES.SIZE;
+        const halfHandleSize = handleSize / 2;
+        const rotationHandleRadius = SHAPE_HANDLES.ROTATION_RADIUS;
+        const center = this._getTextCenter(annotation);
+        const rotation = annotation.rotation || 0;
+
+        // Draw dashed bounding box (rotated)
         ctx.save();
-        
-        const isCtrlPressed = this.state.isCtrlPressed && this.state.interactionMode === 'resizing';
-        
-        Object.values(handlePositions).forEach(pos => {
-            if (pos.type === 'resize') {
-                if (isCtrlPressed) {
-                    ctx.fillStyle = 'rgba(255, 165, 0, 0.7)';
-                    ctx.strokeStyle = 'rgba(255, 165, 0, 0.9)';
-                } else {
-                    ctx.fillStyle = COLORS.HANDLE_FILL;
-                    ctx.strokeStyle = COLORS.HANDLE_STROKE;
-                }
-            } else {
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rotation);
+        ctx.translate(-center.x, -center.y);
+        ctx.setLineDash(COLORS.SELECTION_DASH);
+        ctx.strokeStyle = COLORS.HANDLE_STROKE;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Draw handles at rotated positions
+        for (const key in handlePositions) {
+            const pos = handlePositions[key];
+            if (key === 'rotate') {
+                // Draw rotation handle and line
+                ctx.save();
+                // Draw line from center to rotation handle
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.strokeStyle = COLORS.ROTATION_LINE;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Draw rotation handle
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, rotationHandleRadius, 0, Math.PI * 2);
                 ctx.fillStyle = COLORS.ROTATION_HANDLE_FILL;
                 ctx.strokeStyle = COLORS.ROTATION_HANDLE_STROKE;
-            }
-            
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            
-            if (isCtrlPressed && pos.type === 'resize') {
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+                ctx.lineWidth = 1;
                 ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            } else {
+                // Draw resize handles
+                ctx.fillStyle = COLORS.HANDLE_FILL;
+                ctx.strokeStyle = COLORS.HANDLE_STROKE;
+                ctx.lineWidth = 1;
+                ctx.fillRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
+                ctx.strokeRect(pos.x - halfHandleSize, pos.y - halfHandleSize, handleSize, handleSize);
             }
-        });
-        
-        ctx.restore();
+        }
     }
 
     _getTextCenter(annotation) {
@@ -640,7 +653,7 @@ export class TextTool {
         }
         
         // Add rotation handle
-        const rotationHandleY = y - 20;
+        const rotationHandleY = y - SHAPE_HANDLES.ROTATION_OFFSET;
         const rotationHandle = { x: x + w/2, y: rotationHandleY };
         const rotatedRotationHandle = rotatePoint(rotationHandle, center, rotation);
         handles['rotate'] = { ...rotatedRotationHandle, type: 'rotation' };

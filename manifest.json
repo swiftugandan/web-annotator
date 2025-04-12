@@ -35,7 +35,8 @@
           "src/js/tools/ImageTool.js",
           "src/js/utils/constants.js",
           "src/js/utils/drawingUtils.js",
-          "src/js/utils/geometryUtils.js"
+          "src/js/utils/geometryUtils.js",
+          "src/js/utils/perfectFreehand.js"
       ],
       "matches": ["<all_urls>"]
     }

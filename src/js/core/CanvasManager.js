@@ -196,29 +196,44 @@ export class CanvasManager {
 
     //--- Rendering ---
 
-    redrawAnnotations() {
+    /**
+     * Clear the entire canvas
+     */
+    clearCanvas() {
         if (!this.ctx || !this.elements.canvas) return;
         this.ctx.clearRect(0, 0, this.elements.canvas.width, this.elements.canvas.height);
+    }
 
-        this.state.annotations.forEach((annotation, index) => {
-            if (annotation.type === 'draw') {
-                drawPath(annotation, this.ctx);
-            } else if (annotation.type === 'shape') {
-                 // Shape drawing and handles are managed by ShapeTool
-                 // called within redrawAnnotations
-            } else if (annotation.type === 'text') {
-                 // Text drawing and handles are managed by TextTool
-                 // called within redrawAnnotations
-            } else if (annotation.type === 'image') {
-                 // Image drawing and handles are managed by ImageTool
-                 // called within redrawAnnotations
-            }
+    /**
+     * Draw a single annotation to the canvas
+     * @param {Object} annotation - The annotation to draw
+     */
+    drawAnnotation(annotation) {
+        if (!this.ctx || !this.elements.canvas) return;
+        
+        if (annotation.type === 'draw') {
+            drawPath(annotation, this.ctx);
+        } else if (annotation.type === 'shape') {
+            this.controller.shapeTool?.drawShape(annotation, this.ctx);
+        } else if (annotation.type === 'text') {
+            this.controller.textTool?.drawText(annotation, this.ctx);
+        } else if (annotation.type === 'image') {
+            this.controller.imageTool?.drawImage(annotation, this.ctx);
+        }
+    }
+
+    redrawAnnotations() {
+        if (!this.ctx || !this.elements.canvas) return;
+        this.clearCanvas();
+
+        this.state.annotations.forEach((annotation) => {
+            this.drawAnnotation(annotation);
         });
 
-        // Call specialized drawing methods from managers/tools
-        this.controller.shapeTool?.drawAllShapes(this.ctx);
-        this.controller.textTool?.drawAllTexts(this.ctx);
-        this.controller.imageTool?.drawAllImages(this.ctx);
+        // Call specialized drawing methods for selected elements
+        this.controller.shapeTool?.drawShapeHandles(this.ctx);
+        this.controller.textTool?.drawTextHandles(this.ctx);
+        this.controller.imageTool?.drawImageHandles(this.ctx);
 
         // Note: The above structure assumes redrawAnnotations is the single point of truth.
         // If performance becomes an issue, more granular redraws might be needed.
