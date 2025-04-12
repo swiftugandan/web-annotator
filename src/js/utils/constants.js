@@ -150,7 +150,7 @@ export const PERFECT_FREEHAND_PRESETS = {
 
 // Configuration for perfect-freehand algorithm
 export const PERFECT_FREEHAND_CONFIG = {
-  SIZE: 8,              // Base size (diameter) of the stroke
+  SIZE: 16,             // Base size (diameter) of the stroke (updated from 8 to 16 to match the library defaults)
   THINNING: 0.5,        // Effect of pressure on the stroke's size
   SMOOTHING: 0.5,       // How much to soften the stroke's edges
   STREAMLINE: 0.5,      // How much to streamline the stroke
@@ -158,13 +158,13 @@ export const PERFECT_FREEHAND_CONFIG = {
   USE_PERFECT_FREEHAND: true, // Toggle between perfect-freehand and legacy drawing
   START: {
     CAP: true,          // Whether to draw a cap at the start
-    TAPER: 20,           // The distance to taper from the start (pixels, or true for full stroke length)
-    EASING: easingFunctions.easeIn,     // Easing function for the taper
+    TAPER: 0,           // Updated to 0 (from 20) to match the library default - The distance to taper from the start
+    EASING: easingFunctions.linear,     // Easing function for the taper
   },
   END: {
     CAP: true,          // Whether to draw a cap at the end
-    TAPER: 20,           // The distance to taper at the end (pixels, or true for full stroke length)
-    EASING: easingFunctions.easeOut,     // Easing function for the taper
+    TAPER: 0,           // Updated to 0 (from 20) to match the library default - The distance to taper at the end
+    EASING: easingFunctions.linear,     // Easing function for the taper
   }
 };
 

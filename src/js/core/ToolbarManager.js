@@ -398,14 +398,24 @@ export class ToolbarManager {
 
     const previewColor = this.state.drawColor || '#000000'; 
 
-    // Use current config for preview, but override size slightly for visibility
+    // Use current config for preview
     const options = {
-      ...PERFECT_FREEHAND_CONFIG, // Spread current config
-      size: Math.max(4, this.state.drawWidth * 1.5), // Ensure minimum size for preview
-      simulatePressure: PERFECT_FREEHAND_CONFIG.SIMULATE_PRESSURE, // Respect this setting
+      size: Math.max(4, this.state.drawWidth * 2), // Ensure minimum size for preview
+      thinning: PERFECT_FREEHAND_CONFIG.THINNING,
+      smoothing: PERFECT_FREEHAND_CONFIG.SMOOTHING,
+      streamline: PERFECT_FREEHAND_CONFIG.STREAMLINE,
+      simulatePressure: false, // Use the provided pressure values
       last: true, // Stroke is complete for preview
-      start: { ...PERFECT_FREEHAND_CONFIG.START }, // Use copies
-      end: { ...PERFECT_FREEHAND_CONFIG.END }
+      start: {
+        cap: PERFECT_FREEHAND_CONFIG.START.CAP,
+        taper: PERFECT_FREEHAND_CONFIG.START.TAPER,
+        easing: PERFECT_FREEHAND_CONFIG.START.EASING
+      },
+      end: {
+        cap: PERFECT_FREEHAND_CONFIG.END.CAP,
+        taper: PERFECT_FREEHAND_CONFIG.END.TAPER,
+        easing: PERFECT_FREEHAND_CONFIG.END.EASING
+      }
     };
     
     const outlinePoints = getStroke(points, options);

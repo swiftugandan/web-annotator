@@ -123,9 +123,8 @@ export function drawPerfectFreehandPath(annotation, ctx) {
     thinning: PERFECT_FREEHAND_CONFIG.THINNING,
     smoothing: PERFECT_FREEHAND_CONFIG.SMOOTHING,
     streamline: PERFECT_FREEHAND_CONFIG.STREAMLINE,
-    simulatePressure: PERFECT_FREEHAND_CONFIG.SIMULATE_PRESSURE,
-    easing: t => t, // Default easing function
-    last: true,
+    simulatePressure: false, // Use the provided pressure values
+    last: true, // Stroke is complete
     start: {
       cap: PERFECT_FREEHAND_CONFIG.START.CAP,
       taper: PERFECT_FREEHAND_CONFIG.START.TAPER,

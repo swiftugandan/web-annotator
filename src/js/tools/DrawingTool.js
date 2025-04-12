@@ -99,9 +99,8 @@ export class DrawingTool {
                 thinning: PERFECT_FREEHAND_CONFIG.THINNING,
                 smoothing: PERFECT_FREEHAND_CONFIG.SMOOTHING,
                 streamline: PERFECT_FREEHAND_CONFIG.STREAMLINE,
-                simulatePressure: PERFECT_FREEHAND_CONFIG.SIMULATE_PRESSURE,
-                easing: t => t, // Default easing function
-                last: true,
+                simulatePressure: false, // Use provided pressure values directly
+                last: false, // Not a complete stroke while drawing
                 start: {
                     cap: PERFECT_FREEHAND_CONFIG.START.CAP,
                     taper: PERFECT_FREEHAND_CONFIG.START.TAPER,
